@@ -1,2 +1,5 @@
 # source clips used by tools/build.py --clips (heavy; the encoded ones live in media/)
 tools/src/
+
+# saved variants for comparison (not published)
+tools/versiones/

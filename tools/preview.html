@@ -54,6 +54,9 @@
     </main>
   </div>
 <script>
+  // ?v=<name> previews a saved variant from tools/versiones/<name>/
+  const v = new URLSearchParams(location.search).get('v');
+  if (v) document.querySelector('base').href = '/tools/versiones/' + v + '/';
   fetch('README.md?' + Date.now()).then(r => r.text()).then(t => { document.getElementById('md').innerHTML = t; });
 </script>
 </body>

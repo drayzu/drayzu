@@ -1,7 +1,10 @@
-"""Builds the animated SVGs and clips used by the profile README (drayzu/drayzu).
+"""Shared pieces of the profile README (drayzu/drayzu): fonts, palette, headline, the series stations.
+
+The published README is the sequence made by tools/secuencia.py. Run on its own, this file
+renders the earlier card layout into tools/versiones/tarjetas/media, for comparison:
 
     python tools/build.py           # SVGs only
-    python tools/build.py --clips   # also re-encode the project clips
+    python tools/build.py --clips   # also render the live project cards (animated WebP)
 
 Fonts are subset and embedded, so the SVGs look the same on GitHub as here.
 """
@@ -11,7 +14,7 @@ from fontTools.ttLib import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONTS = os.path.join(ROOT, 'tools', 'fonts')
-OUT = os.path.join(ROOT, 'media')
+OUT = os.path.join(ROOT, 'tools', 'versiones', 'tarjetas', 'media')
 
 SERIES = 'ESCALAS'
 
@@ -21,7 +24,7 @@ THEMES = {
     'light': dict(ink='#1f1d1a', bg='#ffffff', panel='#ffffff',
                   pot='#d6461c', astro='#9a7430', time='#3a64c8', civ='#1f8f73'),
 }
-CARD = dict(THEMES['dark'], card='#0a0d13')   # teasers are dark cards in both themes
+CARD = dict(THEMES['dark'], card='#0d1117')   # cards are dark in both themes
 
 # ------------------------------------------------------------------ fonts
 UNICODES = list(range(0x20, 0x7f)) + list(range(0xa0, 0x100)) + [0x2014, 0x2019, 0x2212]
@@ -64,16 +67,6 @@ def pow10(exp, unit, size, raise_=None):
     return (f'10<tspan dy="-{r}" font-size="{round(size * .68)}">{e}</tspan>'
             f'<tspan dy="{r}">{unit}</tspan>')
 
-def arrow(x, y, s, color, sw=1.6):
-    """A right arrow drawn as a path (the fonts have no arrows)."""
-    return (f'<path d="M{x},{y}h{s}M{x + s - s * .38},{y - s * .32}L{x + s},{y}L{x + s - s * .38},{y + s * .32}" '
-            f'fill="none" stroke="{color}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"/>')
-
-def enter_key(x, y, color, sw=1.6):
-    """The return-key glyph, drawn."""
-    return (f'<path d="M{x + 10},{y - 6}v6h-10M{x + 3.5},{y - 3.5}L{x},{y}L{x + 3.5},{y + 3.5}" fill="none" '
-            f'stroke="{color}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"/>')
-
 def stars(rng, n, x0, y0, x1, y1, color, rmax=1.2):
     out = []
     for _ in range(n):
@@ -84,102 +77,58 @@ def stars(rng, n, x0, y0, x1, y1, color, rmax=1.2):
 
 TWINKLE = '.tw{animation:tw ease-in-out infinite alternate}@keyframes tw{from{opacity:.12}to{opacity:.85}}'
 
-# ------------------------------------------------------------------ header
-AXES = [  # (accent key, left, right, axis name, project, live)
-    ('pot', pow10(-35, ' m', 17), pow10(26, ' m', 17), 'SIZE', 'Potencias', True),
-    ('astro', 'a habitat', 'a star, rebuilt', 'WHAT WE COULD BUILD', 'AstroIngeniería', True),
-    ('time', pow10(-43, ' s', 17), pow10(100, ' yr', 17), 'TIME', 'Tiempo', False),
-    ('civ', 'K 0.7', 'K III', 'CIVILIZATION', 'Civilización', False),
+# ------------------------------------------------------------------ header: title + the series as a line of stations
+STATIONS = [  # (accent key, name, axis, live)
+    ('pot', 'Potencias', 'size', True),
+    ('astro', 'AstroIngeniería', 'what we could build', True),
+    ('time', 'Tiempo', 'time', False),
+    ('civ', 'Civilización', 'civilization', False),
 ]
 
-def header(t):
-    W, H = 1200, 460
+HEADLINE = ('How small, how brief, how far', 'Interactive pieces about the universe, and our place in it.')
+
+def header(t, headline=HEADLINE):
+    title, sub = headline
+    ssize = min(28, round(28 * 1080 / pil_font('serif-italic.woff2', 28).getlength(sub)))
+    tsize = min(100, round(100 * 1040 / pil_font('serif.woff2', 100).getlength(title)))  # long titles shrink to fit
+    W, H = 1200, 470
     ink = t['ink']
     rng = random.Random(11)
-    STEP = 4.0
-    TOTAL = STEP * len(AXES)
-    vis = 100 / len(AXES)
-    x0, x1, ry = 330, 870, 360
+    glow = '#0d1117' if t is THEMES['dark'] else '#ffffff'
     style = (TWINKLE +
              f'.k{{font:400 13px M,monospace;letter-spacing:.42em;fill:{ink};fill-opacity:.5}}'
-             f'.it{{opacity:0;animation:it {TOTAL}s linear infinite both}}'
-             f'@keyframes it{{0%{{opacity:0}}{vis * .08:.2f}%{{opacity:1}}{vis * .9:.2f}%{{opacity:1}}{vis:.2f}%,100%{{opacity:0}}}}'
-             f'.fl{{transform-origin:{x0}px {ry}px;animation:fl {TOTAL}s cubic-bezier(.5,0,.2,1) infinite both}}'
-             f'@keyframes fl{{0%{{transform:scaleX(0)}}{vis * .85:.2f}%,100%{{transform:scaleX(1)}}}}'
-             f'.dt{{animation:dt {TOTAL}s cubic-bezier(.5,0,.2,1) infinite both}}'
-             f'@keyframes dt{{0%{{transform:translateX(0)}}{vis * .85:.2f}%,100%{{transform:translateX({x1 - x0}px)}}}}'
              '.rise{animation:rise 1.4s cubic-bezier(.2,.7,.2,1) both}'
-             '@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}')
-    body = [stars(rng, 170, 10, 10, W - 10, H - 10, ink, 1.25)]
-    if t is THEMES['dark']:
-        body.insert(0, '<defs><radialGradient id="g" cx="50%" cy="45%" r="50%"><stop offset="0" stop-color="#0d1117" stop-opacity=".95"/>'
-                       '<stop offset="1" stop-color="#0d1117" stop-opacity="0"/></radialGradient></defs>')
-    else:
-        body.insert(0, '<defs><radialGradient id="g" cx="50%" cy="45%" r="50%"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/>'
-                       '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs>')
-    body.append(f'<ellipse cx="600" cy="215" rx="470" ry="150" fill="url(#g)"/>')
-    body.append(f'<text class="k rise" x="600" y="112" text-anchor="middle">DRAYZU \u00b7 {SERIES} \u00b7 A SERIES</text>')
-    body.append(f'<text class="rise" x="600" y="222" text-anchor="middle" font-family="S,serif" font-size="100" '
-                f'fill="{ink}" style="animation-delay:.15s">Measuring the universe</text>')
-    body.append(f'<text class="rise" x="600" y="276" text-anchor="middle" font-family="I,serif" font-style="italic" '
-                f'font-size="28" fill="{ink}" fill-opacity=".75" style="animation-delay:.3s">'
-                'Interactive pieces about its size, its time, and what we could build in it.</text>')
-    # the ruler
-    body.append(f'<line x1="{x0}" x2="{x1}" y1="{ry}" y2="{ry}" stroke="{ink}" stroke-opacity=".2"/>')
-    for i in range(21):
-        x = x0 + (x1 - x0) * i / 20
-        hgt = 6 if i % 5 == 0 else 3
-        body.append(f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{ry - hgt}" y2="{ry}" stroke="{ink}" stroke-opacity=".3"/>')
-    for i, (key, left, right, axis, name, live) in enumerate(AXES):
+             '@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}'
+             '.ring{animation:ring 2.8s ease-out infinite;transform-box:fill-box;transform-origin:center}'
+             '@keyframes ring{0%{transform:scale(.6);opacity:.9}100%{transform:scale(2.4);opacity:0}}'
+             '.run{animation:run 6s linear infinite}@keyframes run{to{stroke-dashoffset:-90}}')
+    b = [f'<defs><radialGradient id="g" cx="50%" cy="45%" r="50%"><stop offset="0" stop-color="{glow}" stop-opacity=".95"/>'
+         f'<stop offset="1" stop-color="{glow}" stop-opacity="0"/></radialGradient></defs>',
+         stars(rng, 170, 10, 10, W - 10, H - 10, ink, 1.25),
+         f'<ellipse cx="600" cy="205" rx="470" ry="140" fill="url(#g)"/>',
+         f'<text class="k rise" x="600" y="100" text-anchor="middle">DRAYZU · {SERIES} · A SERIES</text>',
+         f'<text class="rise" x="600" y="208" text-anchor="middle" font-family="S,serif" font-size="{tsize}" '
+         f'fill="{ink}" style="animation-delay:.15s">{title}</text>',
+         f'<text class="rise" x="600" y="262" text-anchor="middle" font-family="I,serif" font-style="italic" '
+         f'font-size="{ssize}" fill="{ink}" fill-opacity=".75" style="animation-delay:.3s">{sub}</text>']
+    xs = [210, 470, 730, 990]
+    ly = 350
+    b.append(f'<line x1="{xs[0]}" x2="{xs[1]}" y1="{ly}" y2="{ly}" stroke="{ink}" stroke-opacity=".35"/>')
+    b.append(f'<line class="run" x1="{xs[1]}" x2="{xs[3]}" y1="{ly}" y2="{ly}" stroke="{ink}" stroke-opacity=".3" stroke-dasharray="3 6"/>')
+    for x, (key, name, axis, live) in zip(xs, STATIONS):
         c = t[key]
-        d = f'animation-delay:{i * STEP:.1f}s'
-        status = '' if live else f'<tspan fill="{ink}" fill-opacity=".45"> \u00b7 in progress</tspan>'
-        body.append(
-            f'<g class="it" style="{d}">'
-            f'<line class="fl" style="{d}" x1="{x0}" x2="{x1}" y1="{ry}" y2="{ry}" stroke="{c}" stroke-width="2"/>'
-            f'<g class="dt" style="{d}"><circle cx="{x0}" cy="{ry}" r="9" fill="{c}" fill-opacity=".2"/>'
-            f'<circle cx="{x0}" cy="{ry}" r="4.5" fill="{c}"/></g>'
-            f'<text x="{x0}" y="{ry - 18}" font-family="M,monospace" font-size="17" fill="{ink}" fill-opacity=".6">{left}</text>'
-            f'<text x="{x1}" y="{ry - 18}" text-anchor="end" font-family="M,monospace" font-size="17" fill="{ink}" fill-opacity=".6">{right}</text>'
-            f'<text x="600" y="{ry + 46}" text-anchor="middle" font-family="M,monospace" font-size="15" letter-spacing="2.5">'
-            f'<tspan fill="{c}">{axis}</tspan><tspan fill="{ink}" fill-opacity=".35"> \u00b7 </tspan>'
-            f'<tspan fill="{ink}" fill-opacity=".8" font-family="I,serif" font-style="italic" font-size="22" letter-spacing="0">{name}</tspan>{status}</text>'
-            '</g>')
-    return svg(W, H, f'drayzu — {SERIES}: measuring the universe. Interactive pieces about its size, its time, and what we could build in it.',
-               style, ''.join(body))
-
-# ------------------------------------------------------------------ caption under a live clip
-def caption(t, key, num, axis, title, tagline, left, right, url):
-    W, H = 1200, 200
-    ink, c = t['ink'], t[key]
-    style = ('.k{animation:k 2.4s ease-in-out infinite}'
-             '@keyframes k{0%,80%,100%{transform:translateY(0)}88%{transform:translateY(2px)}}'
-             '.p{animation:p 2.6s ease-in-out infinite}@keyframes p{0%,100%{opacity:.2}50%{opacity:.55}}')
-    b = []
-    b.append(f'<text x="40" y="52" font-family="M,monospace" font-size="13" letter-spacing="4">'
-             f'<tspan fill="{c}">{num} \u00b7 {axis}</tspan><tspan fill="{ink}" fill-opacity=".4"> \u00b7 LIVE</tspan></text>')
-    b.append(f'<text x="36" y="124" font-family="S,serif" font-size="76" fill="{ink}">{title}</text>')
-    b.append(f'<text x="40" y="166" font-family="I,serif" font-style="italic" font-size="25" fill="{ink}" fill-opacity=".72">{tagline}</text>')
-    # mini ruler
-    rx0, rx1, ry = 720, 1160, 62
-    b.append(f'<text x="{rx0}" y="{ry - 16}" font-family="M,monospace" font-size="14" fill="{ink}" fill-opacity=".6">{left}</text>')
-    b.append(f'<text x="{rx1}" y="{ry - 16}" text-anchor="end" font-family="M,monospace" font-size="14" fill="{ink}" fill-opacity=".6">{right}</text>')
-    b.append(f'<line x1="{rx0}" x2="{rx1}" y1="{ry}" y2="{ry}" stroke="{ink}" stroke-opacity=".25"/>')
-    for i in range(17):
-        x = rx0 + (rx1 - rx0) * i / 16
-        b.append(f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{ry - (6 if i % 4 == 0 else 3)}" y2="{ry}" stroke="{ink}" stroke-opacity=".35"/>')
-    b.append(f'<circle class="p" cx="{rx1}" cy="{ry}" r="10" fill="{c}"/><circle cx="{rx1}" cy="{ry}" r="5" fill="{c}"/>')
-    # enter pill (same as the project READMEs)
-    pw = round(56 + len(url) * 9.75 + 152)
-    px, py, ph = 1160 - pw, 104, 60
-    b.append(f'<rect x="{px}" y="{py}" width="{pw}" height="{ph}" rx="30" fill="{t["panel"]}" stroke="{ink}" stroke-opacity=".3"/>')
-    b.append(arrow(px + 28, py + 30, 15, c))
-    b.append(f'<text x="{px + 56}" y="{py + 36}" font-family="M,monospace" font-size="16" letter-spacing=".5" fill="{ink}">{url}</text>')
-    b.append(f'<g class="k"><rect x="{px + pw - 128}" y="{py + 12}" width="116" height="36" rx="18" fill="{c}"/>'
-             f'<text x="{px + pw - 82}" y="{py + 35}" text-anchor="middle" font-family="M,monospace" font-weight="600" '
-             f'font-size="13" letter-spacing="1.5" fill="#0d0b0a">ENTER</text>'
-             f'{enter_key(px + pw - 46, py + 33, "#0d0b0a", 1.8)}</g>')
-    return svg(W, H, f'{title} — {tagline} Open {url}', style, ''.join(b))
+        if live:
+            b.append(f'<circle cx="{x}" cy="{ly}" r="14" fill="{c}" fill-opacity=".18"/><circle cx="{x}" cy="{ly}" r="6.5" fill="{c}"/>')
+        else:
+            b.append(f'<circle class="ring" cx="{x}" cy="{ly}" r="7" fill="none" stroke="{c}"/>'
+                     f'<circle cx="{x}" cy="{ly}" r="6.5" fill="{t["bg"]}" stroke="{c}" stroke-width="2"/>')
+        soon = '' if live else ' · SOON'
+        b.append(f'<text x="{x}" y="{ly + 46}" text-anchor="middle" font-family="S,serif" font-size="28" fill="{ink}" '
+                 f'fill-opacity="{1 if live else .65}">{name}</text>'
+                 f'<text x="{x}" y="{ly + 72}" text-anchor="middle" font-family="M,monospace" font-size="11.5" letter-spacing="1.5" fill="{c}">'
+                 f'{axis.upper()}{soon}</text>')
+    return svg(W, H, f'drayzu — {SERIES}: {title}. {sub} A series in four pieces: Potencias and AstroIngeniería are live; '
+               'Tiempo and Civilización are coming soon.', style, ''.join(b))
 
 # ------------------------------------------------------------------ divider
 def divider(t):
@@ -199,12 +148,11 @@ def card_frame(t, key, num, axis):
             f'<circle class="bl" cx="447" cy="45.5" r="3.5" fill="{c}"/>'
             f'<text x="568" y="50" text-anchor="end" font-family="M,monospace" font-size="12" letter-spacing="3" fill="{ink}" fill-opacity=".5">IN PROGRESS</text>')
 
-def card_text(t, title, sub, meta):
+def card_text(t, title, sub):
     ink = t['ink']
     return (f'<line x1="32" x2="568" y1="372" y2="372" stroke="{ink}" stroke-opacity=".1"/>'
-            f'<text x="28" y="442" font-family="S,serif" font-size="68" fill="{ink}">{title}</text>'
-            f'<text x="32" y="482" font-family="I,serif" font-style="italic" font-size="23" fill="{ink}" fill-opacity=".72">{sub}</text>'
-            f'<text x="32" y="526" font-family="M,monospace" font-size="13" letter-spacing="1" fill="{ink}" fill-opacity=".45">{meta}</text>')
+            f'<text x="28" y="458" font-family="S,serif" font-size="68" fill="{ink}">{title}</text>'
+            f'<text x="32" y="500" font-family="I,serif" font-style="italic" font-size="23" fill="{ink}" fill-opacity=".72">{sub}</text>')
 
 CARD_CSS = (TWINKLE + '.bl{animation:bl 1.6s steps(1) infinite}@keyframes bl{0%{opacity:1}50%{opacity:.15}}')
 
@@ -294,8 +242,7 @@ def tiempo(t):
         x = 60 + i * 168
         b.append(f'<line x1="{x}" x2="{x + 28}" y1="{ly + 26:.0f}" y2="{ly + 26:.0f}" stroke="{c}" stroke-width="2" {dash} stroke-linecap="round"/>'
                  f'<text x="{x + 38}" y="{ly + 30:.0f}" font-family="M,monospace" font-size="12" fill="{ink}" fill-opacity=".55">{lab}</text>')
-    b.append(card_text(t, 'Tiempo', 'From before the Big Bang to the last light.',
-                       f'{pow10(-43, " s", 13)}  —  {pow10(100, " yr", 13)}  ·  coming soon'))
+    b.append(card_text(t, 'Tiempo', 'From before the Big Bang to the last light.'))
     return svg(600, 560, 'Tiempo — coming soon. From before the Big Bang to the last light: a logarithmic journey through time, '
                'marking what is observed, theoretical and speculative.', style, ''.join(b))
 
@@ -342,42 +289,12 @@ def civilizacion(t):
              f'<animate attributeName="x2" values="{kx0};372;372;{kx0}" keyTimes="0;.8;.93;1" dur="{D}s" repeatCount="indefinite"/></line>')
     b.append(f'<circle cx="{kx0}" cy="{ky}" r="4.5" fill="{c}">'
              f'<animate attributeName="cx" values="{kx0};372;372;{kx0}" keyTimes="0;.8;.93;1" dur="{D}s" repeatCount="indefinite"/></circle>')
-    b.append(card_text(t, 'Civilización', 'Watch a civilization outgrow its planet.',
-                       'AstroIngeniería, made visible  \u00b7  coming soon'))
+    b.append(card_text(t, 'Civilización', 'Watch a civilization outgrow its planet.'))
     return svg(600, 560, 'Civilización — coming soon. AstroIngeniería made visible: a civilization climbs the Kardashev scale '
                'while a Dyson swarm gathers around its star.', style, ''.join(b))
 
-# ------------------------------------------------------------------ footer: the series as a line of stations
-def footer(t):
-    W, H = 1200, 240
-    ink = t['ink']
-    style = ('.ring{animation:ring 2.8s ease-out infinite;transform-box:fill-box;transform-origin:center}'
-             '@keyframes ring{0%{transform:scale(.6);opacity:.9}100%{transform:scale(2.2);opacity:0}}')
-    xs = [150, 450, 750, 1050]
-    ly = 106
-    b = [f'<text x="600" y="46" text-anchor="middle" font-family="M,monospace" font-size="13" letter-spacing="5" fill="{ink}" fill-opacity=".55">'
-         f'{SERIES} \u00b7 2 OF 4 LIVE</text>',
-         f'<line x1="{xs[0]}" x2="{xs[1]}" y1="{ly}" y2="{ly}" stroke="{ink}" stroke-opacity=".35"/>',
-         f'<line x1="{xs[1]}" x2="{xs[3]}" y1="{ly}" y2="{ly}" stroke="{ink}" stroke-opacity=".25" stroke-dasharray="3 6"/>']
-    names = [('pot', 'Potencias', 'size', True), ('astro', 'AstroIngeniería', 'what we could build', True),
-             ('time', 'Tiempo', 'time', False), ('civ', 'Civilización', 'civilization', False)]
-    for x, (key, name, axis, live) in zip(xs, names):
-        c = t[key]
-        if live:
-            b.append(f'<circle cx="{x}" cy="{ly}" r="15" fill="{c}" fill-opacity=".18"/><circle cx="{x}" cy="{ly}" r="7" fill="{c}"/>')
-        else:
-            b.append(f'<circle class="ring" cx="{x}" cy="{ly}" r="8" fill="none" stroke="{c}"/>'
-                     f'<circle cx="{x}" cy="{ly}" r="7" fill="{t["bg"]}" stroke="{c}" stroke-width="2"/>')
-        soon = '' if live else ' \u00b7 SOON'
-        b.append(f'<text x="{x}" y="{ly + 50}" text-anchor="middle" font-family="S,serif" font-size="30" fill="{ink}" fill-opacity="{1 if live else .7}">{name}</text>'
-                 f'<text x="{x}" y="{ly + 76}" text-anchor="middle" font-family="M,monospace" font-size="12" letter-spacing="1.5" fill="{c}">'
-                 f'{axis.upper()}{soon}</text>')
-    b.append(f'<text x="600" y="{H - 10}" text-anchor="middle" font-family="I,serif" font-style="italic" font-size="20" fill="{ink}" fill-opacity=".5">'
-             'The full collection is coming to drayzu.github.io</text>')
-    return svg(W, H, f'{SERIES}, a series in four pieces: Potencias and AstroIngeniería are live; Tiempo and Civilización are coming soon.',
-               style, ''.join(b))
-
-# ------------------------------------------------------------------ clips
+# ------------------------------------------------------------------ live cards: the project clip inside the same card as the teasers
+# Rendered as animated WebP (an SVG on GitHub cannot hold a moving clip), dark in both themes like the teasers.
 def webp_durations(path):
     b = open(path, 'rb').read()
     i, out = 12, []
@@ -388,38 +305,124 @@ def webp_durations(path):
         i += 8 + n + (n & 1)
     return out
 
-def clip(src, dst, keep_every=2, quality=72):
-    from PIL import Image
-    im = Image.open(src)
-    durs = webp_durations(src)
-    frames, out_d = [], []
-    for k in range(0, im.n_frames, keep_every):
-        im.seek(k)
-        frames.append(im.convert('RGBA').copy())
-        out_d.append(sum(durs[k:k + keep_every]))
-    frames[0].save(os.path.join(OUT, dst), save_all=True, append_images=frames[1:], duration=out_d,
-                   loop=0, quality=quality, method=6)
-    print(f'  {dst:<28} {os.path.getsize(os.path.join(OUT, dst)) / 1e6:6.2f} MB  ({len(frames)} frames)')
+def pil_font(name, size):
+    from PIL import ImageFont
+    f = TTFont(os.path.join(FONTS, name))
+    f.flavor = None
+    buf = io.BytesIO()
+    f.save(buf)
+    buf.seek(0)
+    return ImageFont.truetype(buf, size)
 
-CLIPS = {
-    'potencias-{t}.webp': r'E:/Proyectos/ChatGPT/potencias/docs/media/hero-{t}-v3.webp',
-    'astroingenieria-{t}.webp': os.path.join(ROOT, 'tools', 'src', 'astro-hero-{t}.webp'),
+def rgba(hex_, a=1.0, over=None):
+    """An opaque colour: hex_ at opacity a over the card (ImageDraw replaces pixels instead of blending)."""
+    rgb = lambda h: tuple(int(h.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+    fg, bg = rgb(hex_), rgb(over or CARD['card'])
+    return tuple(round(f * a + b * (1 - a)) for f, b in zip(fg, bg)) + (255,)
+
+LIVE = {
+    'potencias': dict(key='pot', num='01', axis='SIZE', title='Potencias',
+                      tagline='Everything is made of something smaller.',
+                      url='drayzu.github.io/Potencias',
+                      src=r'E:/Proyectos/ChatGPT/potencias/docs/media/hero-dark-v3.webp', frames=(6, None), crop=(50, 490), quality=72),
+    'astroingenieria': dict(key='astro', num='02', axis='WHAT WE COULD BUILD', title='AstroIngeniería',
+                            tagline='From orbital habitats to rebuilt stars.',
+                            url='drayzu.github.io/AstroIngenieria',
+                            src=os.path.join(ROOT, 'tools', 'src', 'astro-hero-v5-dark.webp'), frames=(0, 69), crop=None, quality=80),
 }
+
+def live_card(name):
+    from PIL import Image, ImageDraw
+    p = LIVE[name]
+    t = CARD
+    ink, c, bg = t['ink'], t[p['key']], t['card']
+    W, H = 1000, 684
+    cx, cy, cw, ch = 20, 66, 960, 440
+    mono, mono_s = pil_font('mono.woff2', 13), pil_font('mono.woff2', 15)
+    serif, italic = pil_font('serif.woff2', 66), pil_font('serif-italic.woff2', 25)
+
+    def spaced(d, xy, text, font, fill, sp=0.0, anchor_end=False):
+        x, y = xy
+        width = sum(font.getlength(ch_) + sp for ch_ in text) - sp
+        if anchor_end:
+            x -= width
+        for ch_ in text:
+            d.text((x, y), ch_, font=font, fill=fill, anchor='ls')
+            x += font.getlength(ch_) + sp
+        return x
+
+    def base(dot_on):
+        im = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        lay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(lay)
+        d.rounded_rectangle((1, 1, W - 2, H - 2), radius=18, fill=rgba(bg), outline=rgba(ink, .14), width=2)
+        spaced(d, (36, 46), f'{p["num"]} \u00b7 {p["axis"]}', mono, rgba(c), 4)
+        x = spaced(d, (964, 46), 'LIVE', mono, rgba(ink, .55), 3.2, anchor_end=True)
+        lw = sum(mono.getlength(ch_) + 3.2 for ch_ in 'LIVE') - 3.2
+        dx = 964 - lw - 14
+        if dot_on:
+            d.ellipse((dx - 4, 37.5, dx + 4, 45.5), fill=rgba(c))
+        d.line((36, 532, 964, 532), fill=rgba(ink, .1), width=1)
+        d.text((32, 604), p['title'], font=serif, fill=rgba(ink), anchor='ls')
+        d.text((36, 646), p['tagline'], font=italic, fill=rgba(ink, .72), anchor='ls')
+        # enter pill, as in the project READMEs
+        pw = round(56 + mono_s.getlength(p['url']) + 156)
+        px1, py0 = 964, 570
+        px0, py1 = px1 - pw, py0 + 60
+        d.rounded_rectangle((px0, py0, px1, py1), radius=30, fill=rgba(bg), outline=rgba(ink, .3), width=1)
+        ay = py0 + 30
+        d.line((px0 + 26, ay, px0 + 41, ay), fill=rgba(c), width=2)
+        d.line((px0 + 35, ay - 5, px0 + 41, ay, px0 + 35, ay + 5), fill=rgba(c), width=2, joint='curve')
+        d.text((px0 + 54, ay + 6), p['url'], font=mono_s, fill=rgba(ink), anchor='ls')
+        bx0, bx1 = px1 - 128, px1 - 12
+        d.rounded_rectangle((bx0, py0 + 12, bx1, py1 - 12), radius=18, fill=rgba(c))
+        spaced(d, (bx0 + 18, ay + 5), 'ENTER', pil_font('mono.woff2', 13), rgba('#0d0b0a'), 1.5)
+        kx, ky = bx1 - 34, ay + 3
+        d.line((kx + 10, ky - 7, kx + 10, ky, kx, ky), fill=rgba('#0d0b0a'), width=2)
+        d.line((kx + 4, ky - 4, kx, ky, kx + 4, ky + 4), fill=rgba('#0d0b0a'), width=2)
+        im.alpha_composite(lay)
+        return im
+
+    bases = (base(True), base(False))
+    src = Image.open(p['src'])
+    durs = webp_durations(p['src'])
+    a, z = p['frames']
+    z = z or src.n_frames
+    # feathered edges so the clip melts into the card
+    mask = Image.new('L', (cw, ch), 255)
+    md = ImageDraw.Draw(mask)
+    for i in range(40):
+        v = round(255 * (i / 40) ** 1.5)
+        md.rectangle((i, i, cw - 1 - i, ch - 1 - i), outline=v)
+    FADE = 9
+    frames, out_d, elapsed = [], [], 0
+    for k in range(a, z):
+        src.seek(k)
+        fr = src.convert('RGB')
+        if p['crop']:
+            fr = fr.crop((0, p['crop'][0], fr.width, p['crop'][1]))
+        clipbox = Image.new('RGB', (cw, ch), rgba(bg)[:3])
+        clipbox.paste(fr, (0, (ch - fr.height) // 2))
+        left = z - 1 - k
+        if left < FADE:  # fade out, so the loop restarts from the dark
+            clipbox = Image.blend(Image.new('RGB', (cw, ch), rgba(bg)[:3]), clipbox, left / FADE)
+        img = bases[0 if (elapsed // 800) % 2 == 0 else 1].copy()
+        img.paste(clipbox, (cx, cy), mask)
+        frames.append(img)
+        out_d.append(durs[k])
+        elapsed += durs[k]
+    dst = os.path.join(OUT, f'{name}.webp')
+    frames[0].save(dst, save_all=True, append_images=frames[1:], duration=out_d, loop=0,
+                   quality=p['quality'], method=4)
+    print(f'  {name + ".webp":<28} {os.path.getsize(dst) / 1e6:6.2f} MB  ({len(frames)} frames, {sum(out_d) / 1000:.1f} s)')
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     for name, t in THEMES.items():
         write(f'header-{name}.svg', header(t))
-        write(f'potencias-{name}.svg', caption(t, 'pot', '01', 'SIZE', 'Potencias', 'Everything is made of something smaller.',
-                                               pow10(-35, ' m', 14), pow10(26, ' m', 14), 'drayzu.github.io/Potencias'))
-        write(f'astroingenieria-{name}.svg', caption(t, 'astro', '02', 'WHAT WE COULD BUILD', 'AstroIngeniería',
-                                                     'From orbital habitats to rebuilt stars.', 'a habitat', 'a star, rebuilt',
-                                                     'drayzu.github.io/AstroIngenieria'))
         write(f'next-{name}.svg', divider(t))
-        write(f'series-{name}.svg', footer(t))
     write('tiempo.svg', tiempo(CARD))
     write('civilizacion.svg', civilizacion(CARD))
     if '--clips' in sys.argv:
-        for dst, src in CLIPS.items():
-            for th in ('dark', 'light'):
-                clip(src.format(t=th), dst.format(t=th))
+        for name in LIVE:
+            live_card(name)
