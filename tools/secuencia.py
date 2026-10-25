@@ -2,7 +2,7 @@
 
     python tools/secuencia.py        ->  media/serie.avif, serie.webp and link-*.svg (the published README)
 
-Potencias, AstroIngeniería and Tiempo play footage of their own sites; Civilización is a WebGL scene
+Potencias and Tiempo play footage of their own sites; AstroIngeniería and Civilización are WebGL scenes in the same language
 (tools/escenas/escena.html, after the engine of drayzu.github.io/prototypes/vuelo.html)
 rendered frame by frame with headless Chrome at 30 fps (cached in tools/src/escenas; --fresh recaptures them all, --fresh tiempo just that one).
 Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/serie.avif), with a
@@ -323,9 +323,9 @@ def main():
     chrome = Chrome()
     try:
         media = [potencias_media(),
-                 astro_media(),
+                 scene_media(chrome, 'astro2', 9.0, fresh),
                  tiempo_media(),
-                 scene_media(chrome, 'civilizacion', 9.0, fresh)]
+                 scene_media(chrome, 'civ2', 9.0, fresh)]
     finally:
         chrome.close()
 
