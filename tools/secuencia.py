@@ -2,9 +2,9 @@
 
     python tools/secuencia.py        ->  media/serie.avif, serie.webp and link-*.svg (the published README)
 
-Potencias plays its own hero clip; AstroIngeniería, Tiempo and Civilización are WebGL scenes
+Potencias and Tiempo play their own hero clips; AstroIngeniería and Civilización are WebGL scenes
 (tools/escenas/escena.html, after the engine of drayzu.github.io/prototypes/vuelo.html)
-rendered frame by frame with headless Chrome at 30 fps (cached in tools/src/escenas; --fresh recaptures).
+rendered frame by frame with headless Chrome at 30 fps (cached in tools/src/escenas; --fresh recaptures them all, --fresh tiempo just that one).
 Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/serie.avif), with a
 lighter WebP (media/serie.webp) for browsers without AVIF.
 """
@@ -15,7 +15,7 @@ spec = importlib.util.spec_from_file_location('build', os.path.join(HERE, 'build
 B = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(B)
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 import websocket
 
 OUT = os.path.dirname(HERE)
@@ -103,7 +103,7 @@ LY = 236
 PIECES = [  # station index, title, tagline, live
     dict(i=0, title='Potencias', tagline='Everything is made of something smaller.', live=True, url='drayzu.github.io/Potencias'),
     dict(i=1, title='AstroIngeniería', tagline='From orbital habitats to rebuilt stars.', live=True, url='drayzu.github.io/AstroIngenieria'),
-    dict(i=2, title='Tiempo', tagline='From before the Big Bang to the last light.', live=False),
+    dict(i=2, title='Tiempo', tagline='From before the Big Bang to the last light.', live=True, url='drayzu.github.io/Tiempo'),
     dict(i=3, title='Civilización', tagline='Watch a civilization outgrow its planet.', live=False),
 ]
 
@@ -117,8 +117,9 @@ def chrome_layer(active, progress):
     lw = max(1, round(S))
     d.rounded_rectangle(r(1, 1, W - 2, H - 2), radius=round(18 * S), fill=B.rgba(BG), outline=B.rgba(INK, .14), width=2 * lw)
     # line
-    d.line(r(XS[0], LY, XS[1], LY), fill=B.rgba(INK, .32), width=lw)
-    x = XS[1]
+    last_live = max(k for k, s in enumerate(B.STATIONS) if s[3])
+    d.line(r(XS[0], LY, XS[last_live], LY), fill=B.rgba(INK, .32), width=lw)
+    x = XS[last_live]
     while x < XS[3]:
         d.line(r(x, LY, min(x + 3, XS[3]), LY), fill=B.rgba(INK, .28), width=lw)
         x += 9
@@ -207,12 +208,30 @@ def live_media(name):
         return box
     return [((lambda k=k: load(k)), durs[k]) for k in range(a, z)]
 
+# Tiempo's README hero, captured from the site (tiempo/tools/src/frames/hero, 1280 x 720 JPG at 30 fps):
+# one scroll from the Milky Way assembling to the Sun being born, the Earth and now.
+TIEMPO_FRAMES = r'E:/Proyectos/ChatGPT/tiempo/tools/src/frames/hero'
+
+def tiempo_media(first=24, last=312):
+    fade = round(SCENE_FPS * .27)
+    def load(i):
+        fr = Image.open(os.path.join(TIEMPO_FRAMES, f'{i:04d}.jpg')).convert('RGB')
+        h = round(fr.width * MH / MW)
+        y0 = (fr.height - h) // 2
+        fr = fr.crop((0, y0, fr.width, y0 + h)).resize((MWp, MHp), Image.LANCZOS)
+        # screen over the card: its black becomes the card, so the box has no edge
+        fr = ImageChops.screen(fr, DARK)
+        if i > last - fade:
+            fr = Image.blend(fr, DARK, (i - (last - fade)) / (fade + 1))
+        return fr
+    return [((lambda i=i: load(i)), 1000 / SCENE_FPS) for i in range(first, last + 1)]
+
 def scene_media(chrome, piece, seconds, fresh=False):
     """The WebGL scenes in tools/escenas/escena.html, captured once into tools/src/escenas/ (a PNG per frame)."""
     n = round(seconds * SCENE_FPS)
     folder = os.path.join(HERE, 'src', 'escenas', f'{piece}-{MWp}x{MHp}-{SCENE_FPS}')
     have = len([f for f in os.listdir(folder) if f.endswith('.png')]) if os.path.isdir(folder) else 0
-    if fresh or have != n:
+    if fresh is True or piece in (fresh or ()) or have != n:
         spec = importlib.util.spec_from_file_location('capturar', os.path.join(HERE, 'escenas', 'capturar.py'))
         cap = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cap)
@@ -229,6 +248,15 @@ def scene_media(chrome, piece, seconds, fresh=False):
     return [((lambda i=i: load(i)), 1000 / SCENE_FPS) for i in range(n)]
 
 # ------------------------------------------------------------------ the links under the sequence (an image on GitHub is one link)
+def soon_pill(t, key, name):
+    """A piece still in the works: the same pill, quieter, with no way in yet."""
+    ink, c = t['ink'], t[key]
+    body = (f'<rect x="20" y="16" width="560" height="60" rx="30" fill="{t["panel"]}" stroke="{ink}" stroke-opacity=".18" stroke-dasharray="3 5"/>'
+            f'<circle cx="54" cy="46" r="5.5" fill="none" stroke="{c}" stroke-width="2"/>'
+            f'<text x="76" y="56" font-family="S,serif" font-size="28" fill="{ink}" fill-opacity=".55">{name}</text>'
+            f'<text x="556" y="51" text-anchor="end" font-family="M,monospace" font-size="13" letter-spacing="2" fill="{c}" fill-opacity=".8">SOON</text>')
+    return B.svg(600, 92, f'{name}: coming soon', '', body)
+
 def link_pill(t, key, name):
     W_, H_ = 600, 92
     ink, c = t['ink'], t[key]
@@ -253,17 +281,20 @@ def encode_avif(dst):
 
 def main():
     import sys
-    fresh = '--fresh' in sys.argv  # recapture the scenes
+    args = sys.argv[1:]  # --fresh recaptures every scene; --fresh tiempo civilizacion only those
+    names = [a for a in args if not a.startswith('-')]
+    fresh = (names or True) if '--fresh' in args else False
     os.makedirs(os.path.join(OUT, 'media'), exist_ok=True)
     for th, t in B.THEMES.items():
-        for key, slug, name in (('pot', 'potencias', 'Potencias'), ('astro', 'astroingenieria', 'AstroIngeniería')):
+        for key, slug, name in (('pot', 'potencias', 'Potencias'), ('astro', 'astroingenieria', 'AstroIngeniería'), ('time', 'tiempo', 'Tiempo')):
             open(os.path.join(OUT, 'media', f'link-{slug}-{th}.svg'), 'w', encoding='utf-8').write(link_pill(t, key, name))
+        open(os.path.join(OUT, 'media', f'soon-civilizacion-{th}.svg'), 'w', encoding='utf-8').write(soon_pill(t, 'civ', 'Civilización'))
     print('capturing scenes...')
     chrome = Chrome()
     try:
         media = [live_media('potencias'),
                  scene_media(chrome, 'astroingenieria', 9.0, fresh),
-                 scene_media(chrome, 'tiempo', 8.6, fresh),
+                 tiempo_media(),
                  scene_media(chrome, 'civilizacion', 9.0, fresh)]
     finally:
         chrome.close()

@@ -81,7 +81,7 @@ TWINKLE = '.tw{animation:tw ease-in-out infinite alternate}@keyframes tw{from{op
 STATIONS = [  # (accent key, name, axis, live)
     ('pot', 'Potencias', 'size', True),
     ('astro', 'AstroIngeniería', 'what we could build', True),
-    ('time', 'Tiempo', 'time', False),
+    ('time', 'Tiempo', 'time', True),
     ('civ', 'Civilización', 'civilization', False),
 ]
 
