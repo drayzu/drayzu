@@ -627,20 +627,26 @@ if (PIECE === 'astro2') {
   }
   world.add(glow(0x7fa8ff, PR * 3.2, .12));
 
-  // the camera: from beside the ring, back and away, until the star and its sphere fill the view
-  const D = 9.0, view = new THREE.Vector3(), tgt = new THREE.Vector3();
-  const dist = t => Math.exp(lerp(Math.log(1.1), Math.log(17), smooth(.8, 6.4, t))) * (1 + .06 * smooth(6.4, 9, t));
+  // the camera: skimming the ring, a sharp pull back to the planet, a fast swoop to the star, then
+  // circling the sphere as it goes up (Potencias' and Tiempo's pace: big jumps of scale, blur, turns)
+  const D = 9.0, view = new THREE.Vector3(), tgt = new THREE.Vector3(), ringPt = P.clone().add(new THREE.Vector3(PR * 1.6, PR * .55, PR * .5));
+  const L = Math.log;
+  const dist = t => Math.exp(L(.16) + (L(1.5) - L(.16)) * smooth(.15, 1.3, t) + (L(9.5) - L(1.5)) * smooth(1.5, 3.4, t)
+                    + (L(17.5) - L(9.5)) * smooth(3.4, 4.8, t) - L(17.5 / 15.5) * smooth(4.8, 9, t));
   distAt = dist;
   update = t => {
-    uReveal.value = lerp(.04, .62, smooth(2.6, D, t));
+    uReveal.value = lerp(.04, .7, smooth(2.2, 8.6, t));
     sun.material.uniforms.uDim.value = 1 - .35 * uReveal.value;
     cor.material.uniforms.uDim.value = 1 - .5 * uReveal.value;
-    sunGlow.material.opacity = .22 - .12 * uReveal.value;
-    const z = smooth(.8, 6.4, t);
-    tgt.copy(P).lerp(new THREE.Vector3(0, 0, 0), smooth(1.6, 6.2, t));
-    view.set(lerp(.95, -.35, z), lerp(.3, .32, z), lerp(.6, 1, z)).normalize();
+    sunGlow.material.opacity = .12 - .06 * uReveal.value;
+    tgt.copy(ringPt).lerp(P, smooth(.1, 1.2, t)).lerp(new THREE.Vector3(0, 0, 0), smooth(1.6, 3.6, t));
+    const ang = lerp(1.25, -.35, smooth(0, 3.8, t)) + .95 * smooth(3.8, 9, t);
+    const el = lerp(.06, .32, smooth(0, 3.8, t)) - .12 * smooth(4, 9, t);
+    view.set(Math.cos(el) * Math.sin(ang), Math.sin(el), Math.cos(el) * Math.cos(ang));
     camera.position.copy(tgt).addScaledVector(view, dist(t));
     camera.near = dist(t) * .01; camera.updateProjectionMatrix();
+    const roll = .22 * (1 - smooth(0, 2, t)) - .08 * smooth(4, 9, t);
+    camera.up.set(Math.sin(roll), Math.cos(roll), 0);
     camera.lookAt(tgt);
   };
 }
@@ -711,24 +717,29 @@ if (PIECE === 'civ2') {
   const planet = particlePlanet(50000, PR, PR * .012, sunDir, C.civ); planet.position.copy(P); scene.add(planet);
   const pGlow = glow(0x7fd8ff, PR * 3.4, .1); pGlow.position.copy(P); scene.add(pGlow);
 
-  // the camera: a lit night side, then the star and its swarm, then the galaxy lighting up
+  // the camera: skimming the lit night side, a pull to the star and a turn inside its swarm, then a
+  // fast flight out until the whole galaxy turns below, lighting up
   const D = 9.0, view = new THREE.Vector3(), tgt = new THREE.Vector3(), gc = new THREE.Vector3();
-  const dist = t => Math.exp(lerp(Math.log(PR * 3.2), Math.log(S_R * 9), smooth(.9, 3.4, t))
-                    + lerp(0, Math.log(34 / (S_R * 9)), smooth(4.2, 7.6, t)));
+  const L = Math.log;
+  const dist = t => Math.exp(L(PR * 1.5) + (L(PR * 4) - L(PR * 1.5)) * smooth(0, 1.1, t) + (L(S_R * 8) - L(PR * 4)) * smooth(1.1, 2.6, t)
+                    - L(1.25) * smooth(2.6, 4.2, t) + (L(36) - L(S_R * 8 / 1.25)) * smooth(4.3, 6.5, t) - L(36 / 27) * smooth(6.5, 9, t));
   distAt = dist;
   update = t => {
-    pivot.rotation.y = -t * .015;
+    pivot.rotation.y = -t * .05;
     pivot.updateMatrixWorld();
     galaxy.getWorldPosition(gc);
-    uSwarm.value = smooth(1.4, 4.6, t);
+    uSwarm.value = smooth(1.2, 3.8, t);
     starGlow.material.opacity = .25 - .12 * uSwarm.value;
     uGal.value = smooth(4, 14, dist(t));
-    uBubble.value = 12.5 * smooth(5.2, 8.9, t);
-    tgt.copy(P).lerp(new THREE.Vector3(0, 0, 0), smooth(.9, 3.0, t)).lerp(gc, smooth(4.6, 7.8, t));
-    const z = smooth(.9, 7.8, t);
-    view.set(lerp(-.55, -.2, z), lerp(.12, .95, z), lerp(1, .6, z)).normalize();
+    uBubble.value = 12.5 * smooth(5.4, 8.8, t);
+    tgt.copy(P).lerp(new THREE.Vector3(0, 0, 0), smooth(1.0, 2.6, t)).lerp(gc, smooth(4.6, 7.2, t));
+    const ang = lerp(-1.4, .5, smooth(0, 4.2, t)) + 1.1 * smooth(4.2, 9, t);
+    const el = lerp(.05, .2, smooth(0, 4.2, t)) + .75 * smooth(4.4, 7.4, t);
+    view.set(Math.cos(el) * Math.sin(ang), Math.sin(el), Math.cos(el) * Math.cos(ang));
     camera.position.copy(tgt).addScaledVector(view, dist(t));
     camera.near = dist(t) * .01; camera.updateProjectionMatrix();
+    const roll = .25 * (1 - smooth(0, 2.4, t)) + .1 * Math.sin(t * .7) * smooth(4, 7, t);
+    camera.up.set(Math.sin(roll), Math.cos(roll), 0);
     camera.lookAt(tgt);
   };
 }
@@ -738,7 +749,7 @@ window.renderAt = t => {
   shared.uTime.value = t;
   update(t);
   // the zoom blur: how many decades a second the camera's distance is changing
-  zoomBlur.uniforms.uStrength.value = distAt ? Math.min(Math.abs(Math.log10(distAt(t + .05) / distAt(t - .05))) * 10 * .05, .09) : 0;
+  zoomBlur.uniforms.uStrength.value = distAt ? Math.min(Math.abs(Math.log10(distAt(t + .05) / distAt(t - .05))) * 10 * .06, .12) : 0;
   shared.uScale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
   composer.render();
   return true;
