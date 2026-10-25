@@ -245,17 +245,16 @@ def potencias_media():
     d = r'E:/Proyectos/ChatGPT/potencias/tools/src/frames/hero'
     return footage(lambda i: Image.open(os.path.join(d, f'{i:04d}.jpg')).convert('RGB'), 270)
 
-def astro_media(seconds=5.2):
-    """AstroIngeniería's own opening, the part before its interface appears: the flight through a nebula
-    to the birth of a star (from the original recording, 1260 x 540 at 60 fps)."""
-    src = r'E:/Proyectos/ChatGPT/Astroingenieria-readme-archive/docs-readme-intros/intro-principal.mp4'
-    folder = os.path.join(HERE, 'src', 'astro-intro')
-    n = round(seconds * SCENE_FPS)
-    if not os.path.isdir(folder) or len(os.listdir(folder)) < n:
-        os.makedirs(folder, exist_ok=True)
-        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', src, '-t', str(seconds), '-vf', f'fps={SCENE_FPS}', '-q:v', '2',
-                        os.path.join(folder, '%04d.jpg')], check=True)
-    return footage(lambda i: Image.open(os.path.join(folder, f'{i + 1:04d}.jpg')).convert('RGB'), n)
+def astro_media():
+    """AstroIngeniería's Dyson sphere being built, recorded from its own site with the interface hidden
+    (tools/escenas/astro_dyson.py: 3200 x 1720 PNG at 30 fps). The site keeps the sphere high, so the
+    frame is anchored at the top."""
+    folder = os.path.join(HERE, 'src', 'astro-dyson')
+    n = len([f for f in os.listdir(folder) if f.endswith('.png')])
+    def rgb(i):
+        fr = Image.open(os.path.join(folder, f'{i:04d}.png')).convert('RGB')
+        return fr.crop((0, 0, fr.width, round(fr.width * MH / MW)))
+    return footage(rgb, n)
 
 def scene_media(chrome, piece, seconds, fresh=False):
     """The WebGL scenes in tools/escenas/escena.html, captured once into tools/src/escenas/ (a PNG per frame)."""
