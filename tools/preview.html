@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="/">
+<title>Profile preview</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1f2328; --muted:#59636e; --border:#d1d9e0; --btn:#f6f8fa; --link:#0969da; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0d1117; --fg:#f0f6fc; --muted:#9198a1; --border:#3d444d; --btn:#212830; --link:#4493f8; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif; }
+  .top { border-bottom:1px solid var(--border); padding:0 32px; display:flex; gap:24px; height:48px; align-items:flex-end; }
+  .top span { padding:8px 0 10px; color:var(--muted); }
+  .top span.on { color:var(--fg); font-weight:600; border-bottom:2px solid #fd8c73; }
+  .wrap { max-width:1280px; margin:0 auto; padding:24px 32px; display:flex; gap:24px; }
+  aside { width:296px; flex:none; }
+  aside img { width:296px; height:296px; border-radius:50%; border:1px solid var(--border); display:block; }
+  aside h1 { margin:16px 0 0; font-size:24px; line-height:1.25; }
+  aside .login { font-size:20px; color:var(--muted); font-weight:300; }
+  aside .btn { margin:16px 0; display:block; text-align:center; padding:5px; border:1px solid var(--border); border-radius:6px; background:var(--btn); font-weight:500; }
+  main { flex:1; min-width:0; }
+  .readme { border:1px solid var(--border); border-radius:6px; padding:24px; }
+  .readme .path { font-size:12px; color:var(--muted); margin-bottom:12px; font-family:ui-monospace,monospace; }
+  .readme p { margin:0 0 16px; }
+  .readme img { max-width:100%; vertical-align:middle; }
+  .pins h2 { font-size:16px; font-weight:400; margin:24px 0 8px; }
+  .pins .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .pin { border:1px solid var(--border); border-radius:6px; padding:16px; font-size:12px; color:var(--muted); }
+  .pin b { color:var(--link); font-size:14px; }
+  @media (max-width: 860px) { .wrap { flex-direction:column; padding:16px; } aside { width:100%; } aside img { width:120px; height:120px; } .pins .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+  <div class="top"><span class="on">Overview</span><span>Repositories 18</span><span>Projects</span><span>Packages</span><span>Stars 7</span></div>
+  <div class="wrap">
+    <aside>
+      <img src="https://github.com/drayzu.png" alt="">
+      <h1>Diego</h1>
+      <div class="login">drayzu</div>
+      <span class="btn">Edit profile</span>
+    </aside>
+    <main>
+      <div class="readme"><div class="path">drayzu / README.md</div><div id="md">Loading…</div></div>
+      <div class="pins">
+        <h2>Pinned</h2>
+        <div class="grid">
+          <div class="pin"><b>AstroIngenieria</b><p>Exploring how intelligence could reshape worlds, stars and, one day, the cosmos that gave birth to it.</p>TypeScript</div>
+          <div class="pin"><b>Potencias</b><p>Everything is made of something smaller. One scroll, from the foam of spacetime to the edge of everything.</p>TypeScript</div>
+        </div>
+      </div>
+    </main>
+  </div>
+<script>
+  fetch('README.md?' + Date.now()).then(r => r.text()).then(t => { document.getElementById('md').innerHTML = t; });
+</script>
+</body>
+</html>
