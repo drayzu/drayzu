@@ -627,25 +627,26 @@ if (PIECE === 'astro2') {
   }
   world.add(glow(0x7fa8ff, PR * 3.2, .12));
 
-  // the camera: skimming the ring, a sharp pull back to the planet, a fast swoop to the star, then
-  // circling the sphere as it goes up (Potencias' and Tiempo's pace: big jumps of scale, blur, turns)
-  const D = 9.0, view = new THREE.Vector3(), tgt = new THREE.Vector3(), ringPt = P.clone().add(new THREE.Vector3(PR * 1.6, PR * .55, PR * .5));
+  // the camera: gliding beside the ring and drawing back, then a fast pull out (blur) with the star
+  // coming into view, then a push in on the sphere, centred, turning as it goes up
+  const D = 9.0, view = new THREE.Vector3(), tgt = new THREE.Vector3(), O = new THREE.Vector3(0, 0, 0);
   const L = Math.log;
-  const dist = t => Math.exp(L(.16) + (L(1.5) - L(.16)) * smooth(.15, 1.3, t) + (L(9.5) - L(1.5)) * smooth(1.5, 3.4, t)
-                    + (L(17.5) - L(9.5)) * smooth(3.4, 4.8, t) - L(17.5 / 15.5) * smooth(4.8, 9, t));
+  const dist = t => Math.exp(L(1.15) + (L(2.6) - L(1.15)) * smooth(0, 2.2, t) + (L(30) - L(2.6)) * smooth(2.1, 4.2, t)
+                    - L(30 / 17) * smooth(4.2, 9, t));
   distAt = dist;
   update = t => {
-    uReveal.value = lerp(.04, .7, smooth(2.2, 8.6, t));
+    uReveal.value = lerp(.04, .7, smooth(2.6, 8.8, t));
     sun.material.uniforms.uDim.value = 1 - .35 * uReveal.value;
     cor.material.uniforms.uDim.value = 1 - .5 * uReveal.value;
     sunGlow.material.opacity = .12 - .06 * uReveal.value;
-    tgt.copy(ringPt).lerp(P, smooth(.1, 1.2, t)).lerp(new THREE.Vector3(0, 0, 0), smooth(1.6, 3.6, t));
-    const ang = lerp(1.25, -.35, smooth(0, 3.8, t)) + .95 * smooth(3.8, 9, t);
-    const el = lerp(.06, .32, smooth(0, 3.8, t)) - .12 * smooth(4, 9, t);
+    tgt.copy(P).lerp(O, smooth(2.35, 2.85, t));
+    // around the planet it glides sideways; from the pull out on, it faces the star from the planet's side
+    const ang = lerp(.35, 1.05, smooth(0, 2.4, t)) + lerp(0, -1.5, smooth(2.2, 4.4, t)) + .5 * smooth(4.4, 9, t);
+    const el = lerp(.12, .26, smooth(0, 4.4, t)) - .08 * smooth(4.4, 9, t);
     view.set(Math.cos(el) * Math.sin(ang), Math.sin(el), Math.cos(el) * Math.cos(ang));
     camera.position.copy(tgt).addScaledVector(view, dist(t));
     camera.near = dist(t) * .01; camera.updateProjectionMatrix();
-    const roll = .22 * (1 - smooth(0, 2, t)) - .08 * smooth(4, 9, t);
+    const roll = .12 * (1 - smooth(0, 3, t));
     camera.up.set(Math.sin(roll), Math.cos(roll), 0);
     camera.lookAt(tgt);
   };
