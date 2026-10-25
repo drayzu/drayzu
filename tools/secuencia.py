@@ -1,10 +1,12 @@
 """Prototype: the whole series as one animated WebP that plays the four pieces in sequence.
 
-    python tools/secuencia.py        ->  media/serie.webp and media/link-*.svg (the published README)
+    python tools/secuencia.py        ->  media/serie.avif, serie.webp and link-*.svg (the published README)
 
 Potencias plays its own hero clip; AstroIngeniería, Tiempo and Civilización are WebGL scenes
 (tools/escenas/escena.html, after the engine of drayzu.github.io/prototypes/vuelo.html)
-rendered frame by frame with headless Chrome. Everything is composed with Pillow.
+rendered frame by frame with headless Chrome at 30 fps (cached in tools/src/escenas; --fresh recaptures).
+Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/serie.avif), with a
+lighter WebP (media/serie.webp) for browsers without AVIF.
 """
 import base64, importlib.util, io, json, os, socket, subprocess, tempfile, time, urllib.request
 
@@ -20,10 +22,16 @@ OUT = os.path.dirname(HERE)
 CHROME = r'C:/Program Files/Google/Chrome/Application/chrome.exe'
 T = B.CARD
 INK, BG = T['ink'], T['card']
-W, H = 1000, 900
+W, H = 1000, 900                           # layout units
 MX, MY, MW, MH = 20, 318, 960, 440        # media box
-FPS_MS = 66
-XFADE = 7                                  # frames of crossfade between pieces
+Z = 1.84                                   # px per unit: 1840 px wide, about twice the README column, sharp on HiDPI screens
+CW, CH = round(W * Z), round(H * Z)
+MXp, MYp, MWp, MHp = (round(v * Z) for v in (MX, MY, MW, MH))
+SCENE_FPS = 30
+TICK = 60                                  # frames are fed to ffmpeg on a 60 per second clock
+XFADE_S = .45                              # seconds of crossfade between pieces
+AVIF_CRF, AVIF_PRESET = 34, 5
+WEBP_W, WEBP_Q = 920, 55                   # fallback for browsers without AVIF
 
 # ------------------------------------------------------------------ headless chrome
 class Chrome:
@@ -62,18 +70,23 @@ class Chrome:
         self.ws.close()
         self.proc.kill()
 
-# ------------------------------------------------------------------ layout
-mono = B.pil_font('mono.woff2', 13)
-mono_s = B.pil_font('mono.woff2', 11)
-mono_p = B.pil_font('mono.woff2', 14)
-serif_t = B.pil_font('serif.woff2', 66)
-serif_n = B.pil_font('serif.woff2', 23)
-serif_h = B.pil_font('serif.woff2', 58)
-italic_s = B.pil_font('serif-italic.woff2', 23)
-italic_h = B.pil_font('serif-italic.woff2', 23)
+# ------------------------------------------------------------------ layout (in 1000 x 900 units, drawn at Z px per unit)
+def font(name, size):
+    return B.pil_font(name, round(size * Z))
+
+mono = font('mono.woff2', 13)
+mono_s = font('mono.woff2', 11)
+mono_p = font('mono.woff2', 14)
+serif_t = font('serif.woff2', 66)
+serif_n = font('serif.woff2', 23)
+serif_h = font('serif.woff2', 58)
+italic_s = font('serif-italic.woff2', 23)
+italic_h = font('serif-italic.woff2', 23)
 
 def spaced(d, xy, text, font, fill, sp=0.0, anchor='l'):
-    x, y = xy
+    """Letter-spaced text; xy and sp in layout units."""
+    x, y = xy[0] * Z, xy[1] * Z
+    sp *= Z
     width = sum(font.getlength(c) + sp for c in text) - sp
     if anchor == 'r':
         x -= width
@@ -96,118 +109,124 @@ PIECES = [  # station index, title, tagline, live
 
 def chrome_layer(active, progress):
     """Everything but the media: header, the line of stations (active one lit, with a progress ring) and the caption."""
-    S = 2  # supersample the line and rings
-    im = Image.new('RGBA', (W * S, H * S), (0, 0, 0, 0))
+    S = 2 * Z  # shapes are supersampled
+    def r(*v):
+        return tuple(round(x * S) for x in v)
+    im = Image.new('RGBA', (round(W * S), round(H * S)), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    d.rounded_rectangle((S, S, W * S - 2 * S, H * S - 2 * S), radius=18 * S, fill=B.rgba(BG), outline=B.rgba(INK, .14), width=2 * S)
+    lw = max(1, round(S))
+    d.rounded_rectangle(r(1, 1, W - 2, H - 2), radius=round(18 * S), fill=B.rgba(BG), outline=B.rgba(INK, .14), width=2 * lw)
     # line
-    d.line((XS[0] * S, LY * S, XS[1] * S, LY * S), fill=B.rgba(INK, .32), width=S)
+    d.line(r(XS[0], LY, XS[1], LY), fill=B.rgba(INK, .32), width=lw)
     x = XS[1]
     while x < XS[3]:
-        d.line((x * S, LY * S, min(x + 3, XS[3]) * S, LY * S), fill=B.rgba(INK, .28), width=S)
+        d.line(r(x, LY, min(x + 3, XS[3]), LY), fill=B.rgba(INK, .28), width=lw)
         x += 9
     for k, (key, name, axis, live) in enumerate(B.STATIONS):
         c = T[key]
-        cx, cy = XS[k] * S, LY * S
+        cx, cy = XS[k], LY
         if k == active:
-            d.ellipse((cx - 17 * S, cy - 17 * S, cx + 17 * S, cy + 17 * S), outline=B.rgba(INK, .14), width=S)
-            d.arc((cx - 17 * S, cy - 17 * S, cx + 17 * S, cy + 17 * S), -90, -90 + 360 * progress, fill=B.rgba(c), width=2 * S)
+            d.ellipse(r(cx - 17, cy - 17, cx + 17, cy + 17), outline=B.rgba(INK, .14), width=lw)
+            d.arc(r(cx - 17, cy - 17, cx + 17, cy + 17), -90, -90 + 360 * progress, fill=B.rgba(c), width=2 * lw)
         if live:
-            d.ellipse((cx - 13 * S, cy - 13 * S, cx + 13 * S, cy + 13 * S), fill=B.rgba(c, .18))
-            d.ellipse((cx - 6 * S, cy - 6 * S, cx + 6 * S, cy + 6 * S), fill=B.rgba(c))
+            d.ellipse(r(cx - 13, cy - 13, cx + 13, cy + 13), fill=B.rgba(c, .18))
+            d.ellipse(r(cx - 6, cy - 6, cx + 6, cy + 6), fill=B.rgba(c))
         else:
-            d.ellipse((cx - 6 * S, cy - 6 * S, cx + 6 * S, cy + 6 * S), fill=B.rgba(BG), outline=B.rgba(c), width=2 * S)
-    im = im.resize((W, H), Image.LANCZOS)
+            d.ellipse(r(cx - 6, cy - 6, cx + 6, cy + 6), fill=B.rgba(BG), outline=B.rgba(c), width=2 * lw)
+    im = im.resize((CW, CH), Image.LANCZOS)
     d = ImageDraw.Draw(im)
-    spaced(d, (W / 2, 62), f'DRAYZU \u00b7 {B.SERIES} \u00b7 A SERIES', mono, B.rgba(INK, .45), 5.5, 'm')
+    def z(*v):
+        return tuple(round(x * Z) for x in v)
+    spaced(d, (W / 2, 62), f'DRAYZU · {B.SERIES} · A SERIES', mono, B.rgba(INK, .45), 5.5, 'm')
     title, sub = B.HEADLINE
-    d.text((W / 2, 140), title, font=serif_t, fill=B.rgba(INK), anchor='ms')
-    d.text((W / 2, 180), sub, font=italic_s, fill=B.rgba(INK, .72), anchor='ms')
+    d.text(z(W / 2, 140), title, font=serif_t, fill=B.rgba(INK), anchor='ms')
+    d.text(z(W / 2, 180), sub, font=italic_s, fill=B.rgba(INK, .72), anchor='ms')
     for k, (key, name, axis, live) in enumerate(B.STATIONS):
         on = k == active
-        d.text((XS[k], LY + 42), name, font=serif_n, fill=B.rgba(INK, .95 if on else .4), anchor='ms')
-        spaced(d, (XS[k], LY + 62), axis.upper() + ('' if live else ' \u00b7 SOON'), mono_s,
+        d.text(z(XS[k], LY + 42), name, font=serif_n, fill=B.rgba(INK, .95 if on else .4), anchor='ms')
+        spaced(d, (XS[k], LY + 62), axis.upper() + ('' if live else ' · SOON'), mono_s,
                B.rgba(T[key], 1 if on else .45), 1.5, 'm')
     # caption under the media
     p = PIECES[active]
     c = T[B.STATIONS[active][0]]
-    d.text((32, H - 66), p['title'], font=serif_h, fill=B.rgba(INK), anchor='ls')
-    d.text((36, H - 30), p['tagline'], font=italic_h, fill=B.rgba(INK, .72), anchor='ls')
+    w1, w2 = max(1, round(Z)), max(2, round(2 * Z))
+    d.text(z(32, H - 66), p['title'], font=serif_h, fill=B.rgba(INK), anchor='ls')
+    d.text(z(36, H - 30), p['tagline'], font=italic_h, fill=B.rgba(INK, .72), anchor='ls')
     py0, py1, px1 = H - 104, H - 48, W - 36
     if p['live']:
-        pw = round(52 + mono_p.getlength(p['url']) + 150)
+        pw = round(52 + mono_p.getlength(p['url']) / Z + 150)
         px0 = px1 - pw
-        d.rounded_rectangle((px0, py0, px1, py1), radius=28, fill=B.rgba(BG), outline=B.rgba(INK, .3), width=1)
-        ay = (py0 + py1) // 2
-        d.line((px0 + 24, ay, px0 + 38, ay), fill=B.rgba(c), width=2)
-        d.line((px0 + 32, ay - 5, px0 + 38, ay, px0 + 32, ay + 5), fill=B.rgba(c), width=2, joint='curve')
-        d.text((px0 + 50, ay + 5), p['url'], font=mono_p, fill=B.rgba(INK), anchor='ls')
+        d.rounded_rectangle(z(px0, py0, px1, py1), radius=round(28 * Z), fill=B.rgba(BG), outline=B.rgba(INK, .3), width=w1)
+        ay = (py0 + py1) / 2
+        d.line(z(px0 + 24, ay, px0 + 38, ay), fill=B.rgba(c), width=w2)
+        d.line(z(px0 + 32, ay - 5, px0 + 38, ay, px0 + 32, ay + 5), fill=B.rgba(c), width=w2, joint='curve')
+        d.text(z(px0 + 50, ay + 5), p['url'], font=mono_p, fill=B.rgba(INK), anchor='ls')
         bx0, bx1 = px1 - 124, px1 - 11
-        d.rounded_rectangle((bx0, py0 + 11, bx1, py1 - 11), radius=17, fill=B.rgba(c))
+        d.rounded_rectangle(z(bx0, py0 + 11, bx1, py1 - 11), radius=round(17 * Z), fill=B.rgba(c))
         spaced(d, (bx0 + 17, ay + 5), 'ENTER', mono, B.rgba('#0d0b0a'), 1.5)
         kx, ky = bx1 - 32, ay + 3
-        d.line((kx + 10, ky - 7, kx + 10, ky, kx, ky), fill=B.rgba('#0d0b0a'), width=2)
-        d.line((kx + 4, ky - 4, kx, ky, kx + 4, ky + 4), fill=B.rgba('#0d0b0a'), width=2)
+        d.line(z(kx + 10, ky - 7, kx + 10, ky, kx, ky), fill=B.rgba('#0d0b0a'), width=w2, joint='curve')
+        d.line(z(kx + 4, ky - 4, kx, ky, kx + 4, ky + 4), fill=B.rgba('#0d0b0a'), width=w2, joint='curve')
     else:
         label = 'IN PROGRESS'
-        pw = round(mono.getlength(label) + 3 * len(label) + 64)
+        pw = round(mono.getlength(label) / Z + 3 * len(label) + 64)
         px0 = px1 - pw
-        d.rounded_rectangle((px0, py0, px1, py1), radius=28, fill=B.rgba(BG), outline=B.rgba(INK, .22), width=1)
-        ay = (py0 + py1) // 2
-        d.ellipse((px0 + 24, ay - 4, px0 + 32, ay + 4), fill=B.rgba(c))
+        d.rounded_rectangle(z(px0, py0, px1, py1), radius=round(28 * Z), fill=B.rgba(BG), outline=B.rgba(INK, .22), width=w1)
+        ay = (py0 + py1) / 2
+        d.ellipse(z(px0 + 24, ay - 4, px0 + 32, ay + 4), fill=B.rgba(c))
         spaced(d, (px0 + 44, ay + 5), label, mono, B.rgba(INK, .6), 3)
-    return im
+    return im.convert('RGB')
 
 def feather():
-    mask = Image.new('L', (MW, MH), 255)
+    mask = Image.new('L', (MWp, MHp), 255)
     md = ImageDraw.Draw(mask)
-    for i in range(40):
-        md.rectangle((i, i, MW - 1 - i, MH - 1 - i), outline=round(255 * (i / 40) ** 1.5))
+    n = round(40 * Z)
+    for i in range(n):
+        md.rectangle((i, i, MWp - 1 - i, MHp - 1 - i), outline=round(255 * (i / n) ** 1.5))
     return mask
 
 MASK = feather()
+DARK = Image.new('RGB', (MWp, MHp), B.rgba(BG)[:3])
 
-def boxed(fr):
-    box = Image.new('RGB', (MW, MH), B.rgba(BG)[:3])
-    box.paste(fr, ((MW - fr.width) // 2, (MH - fr.height) // 2))
-    return box
-
-# ------------------------------------------------------------------ the media of each piece: [(RGB 960x440, ms)]
-def live_media(name, loops=1):
+# ------------------------------------------------------------------ the media of each piece: [(loader -> RGB MWp x MHp, ms)]
+def live_media(name):
+    """A live piece's hero clip (its own frame rate), cropped to the media box and scaled up to it."""
     p = B.LIVE[name]
     src = Image.open(p['src'])
     durs = B.webp_durations(p['src'])
     a, z = p['frames']
     z = z or src.n_frames
-    out = []
-    for k in range(a, z):
+    def load(k):
         src.seek(k)
         fr = src.convert('RGB')
         if p['crop']:
             fr = fr.crop((0, p['crop'][0], fr.width, p['crop'][1]))
-        out.append((boxed(fr), durs[k]))
-    if loops > 1:  # fade between loops so the repeat is not a jump
-        one = out
-        out = []
-        for _ in range(loops):
-            seg = list(one)
-            for j in range(6):
-                img, ms = seg[-6 + j]
-                seg[-6 + j] = (Image.blend(img, Image.new('RGB', img.size, B.rgba(BG)[:3]), (j + 1) / 7), ms)
-            out += seg
-    return out
+        fr = fr.resize((round(fr.width * Z), round(fr.height * Z)), Image.LANCZOS)
+        box = DARK.copy()
+        box.paste(fr, ((MWp - fr.width) // 2, (MHp - fr.height) // 2))
+        return box
+    return [((lambda k=k: load(k)), durs[k]) for k in range(a, z)]
 
-def scene_media(chrome, piece, seconds):
-    """The WebGL scenes in tools/escenas/escena.html (Tiempo, Civilización)."""
-    spec = importlib.util.spec_from_file_location('capturar', os.path.join(HERE, 'escenas', 'capturar.py'))
-    cap = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(cap)
-    times = [i * FPS_MS / 1000 for i in range(round(seconds * 1000 / FPS_MS))]
-    frames = cap.scene_frames(chrome, piece, times, size=(MW, MH))
-    for j in range(8):  # fade out the last frames
-        k = len(frames) - 8 + j
-        frames[k] = Image.blend(frames[k], Image.new('RGB', (MW, MH), B.rgba(BG)[:3]), (j + 1) / 9)
-    return [(f, FPS_MS) for f in frames]
+def scene_media(chrome, piece, seconds, fresh=False):
+    """The WebGL scenes in tools/escenas/escena.html, captured once into tools/src/escenas/ (a PNG per frame)."""
+    n = round(seconds * SCENE_FPS)
+    folder = os.path.join(HERE, 'src', 'escenas', f'{piece}-{MWp}x{MHp}-{SCENE_FPS}')
+    have = len([f for f in os.listdir(folder) if f.endswith('.png')]) if os.path.isdir(folder) else 0
+    if fresh or have != n:
+        spec = importlib.util.spec_from_file_location('capturar', os.path.join(HERE, 'escenas', 'capturar.py'))
+        cap = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cap)
+        os.makedirs(folder, exist_ok=True)
+        t0 = time.time()
+        cap.scene_frames(chrome, piece, [i / SCENE_FPS for i in range(n)], size=(MWp, MHp), out_dir=folder)
+        print(f'  {piece}: {n} frames in {time.time() - t0:.0f} s')
+    fade = round(SCENE_FPS * .27)  # fade out the last frames
+    def load(i):
+        fr = Image.open(os.path.join(folder, f'{i:04d}.png')).convert('RGB')
+        if i >= n - fade:
+            fr = Image.blend(fr, DARK, (i - (n - fade) + 1) / (fade + 1))
+        return fr
+    return [((lambda i=i: load(i)), 1000 / SCENE_FPS) for i in range(n)]
 
 # ------------------------------------------------------------------ the links under the sequence (an image on GitHub is one link)
 def link_pill(t, key, name):
@@ -222,47 +241,74 @@ def link_pill(t, key, name):
     return B.svg(W_, H_, f'Enter {name}', '', body)
 
 # ------------------------------------------------------------------ compose
+def encode_avif(dst):
+    """ffmpeg reads raw frames on a 60 per second clock (each frame repeated for its duration); the repeats are
+    dropped again (mpdecimate) so the AVIF keeps each frame's own duration."""
+    return subprocess.Popen(
+        ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{CW}x{CH}', '-r', str(TICK), '-i', '-',
+         '-vf', 'mpdecimate=hi=1:lo=1:frac=0:max=0,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p', '-fps_mode', 'vfr',
+         '-color_primaries', 'bt709', '-color_trc', 'iec61966-2-1', '-colorspace', 'bt709', '-color_range', 'tv',
+         '-c:v', 'libsvtav1', '-preset', str(AVIF_PRESET), '-crf', str(AVIF_CRF), '-g', '600', '-loop', '0', dst],
+        stdin=subprocess.PIPE)
+
 def main():
+    import sys
+    fresh = '--fresh' in sys.argv  # recapture the scenes
     os.makedirs(os.path.join(OUT, 'media'), exist_ok=True)
     for th, t in B.THEMES.items():
         for key, slug, name in (('pot', 'potencias', 'Potencias'), ('astro', 'astroingenieria', 'AstroIngeniería')):
             open(os.path.join(OUT, 'media', f'link-{slug}-{th}.svg'), 'w', encoding='utf-8').write(link_pill(t, key, name))
-    print('capturing teasers...')
+    print('capturing scenes...')
     chrome = Chrome()
     try:
         media = [live_media('potencias'),
-                 scene_media(chrome, 'astroingenieria', 9.0),
-                 scene_media(chrome, 'tiempo', 8.6),
-                 scene_media(chrome, 'civilizacion', 9.0)]
+                 scene_media(chrome, 'astroingenieria', 9.0, fresh),
+                 scene_media(chrome, 'tiempo', 8.6, fresh),
+                 scene_media(chrome, 'civilizacion', 9.0, fresh)]
     finally:
         chrome.close()
+
+    def compose(k, img, progress, cache):
+        step = round(24 * progress)
+        if step not in cache:
+            cache.clear()
+            cache[step] = chrome_layer(k, step / 24)
+        fr = cache[step].copy()
+        fr.paste(img, (MXp, MYp), MASK)
+        return fr
+
     print('composing...')
-    frames, durs = [], []
+    avif = os.path.join(OUT, 'media', 'serie.avif')
+    enc = encode_avif(avif)
+    last = compose(len(media) - 1, media[-1][-1][0](), 1, {})  # the loop crossfades from the end back to the start
+    webp, webp_durs = [], []
     for k, seq in enumerate(media):
         total = sum(ms for _, ms in seq)
-        cache, t = {}, 0
-        for img, ms in seq:
-            step = round(24 * t / total)
-            if step not in cache:
-                cache[step] = chrome_layer(k, step / 24)
-            fr = cache[step].copy()
-            fr.paste(img, (MX, MY), MASK)
-            frames.append(fr)
-            durs.append(ms)
+        cache, t, prev, wt = {}, 0, last, 0
+        xf = round(XFADE_S * 1000 / seq[0][1])
+        for i, (load, ms) in enumerate(seq):
+            fr = compose(k, load(), t / total, cache)
+            if i < xf:
+                fr = Image.blend(prev, fr, (i + 1) / (xf + 1))
+            ticks = round((t + ms) * TICK / 1000) - round(t * TICK / 1000)
+            raw = fr.tobytes()
+            for _ in range(ticks):
+                enc.stdin.write(raw)
+            if t >= wt:  # the WebP fallback, at about 15 frames per second
+                webp.append(fr.resize((WEBP_W, round(CH * WEBP_W / CW)), Image.LANCZOS))
+                webp_durs.append(0)
+                wt += 66
+            webp_durs[-1] += ms
             t += ms
-    # crossfade into each piece (and from the last back to the first)
-    starts = [0]
-    for seq in media[:-1]:
-        starts.append(starts[-1] + len(seq))
-    for s in starts:
-        prev = frames[s - 1].copy()
-        for j in range(XFADE):
-            frames[s + j] = Image.blend(prev, frames[s + j], (j + 1) / (XFADE + 1))
-    # composed at 1000 px, published at about the README's own width; particles are costly, hence the quality
-    frames = [f.resize((920, round(H * 920 / W)), Image.LANCZOS) for f in frames]
+            last = fr
+        print(f'  {PIECES[k]["title"]}: {len(seq)} frames')
+    enc.stdin.close()
+    enc.wait()
+    print(f'  serie.avif  {os.path.getsize(avif) / 1e6:.2f} MB  ({CW}x{CH})')
     dst = os.path.join(OUT, 'media', 'serie.webp')
-    frames[0].save(dst, save_all=True, append_images=frames[1:], duration=durs, loop=0, quality=58, method=4)
-    print(f'  serie.webp  {os.path.getsize(dst) / 1e6:.2f} MB  ({len(frames)} frames, {sum(durs) / 1000:.1f} s)')
+    webp_durs = [round(d) for d in webp_durs]
+    webp[0].save(dst, save_all=True, append_images=webp[1:], duration=webp_durs, loop=0, quality=WEBP_Q, method=4)
+    print(f'  serie.webp  {os.path.getsize(dst) / 1e6:.2f} MB  ({len(webp)} frames, {sum(webp_durs) / 1000:.1f} s)')
 
 if __name__ == '__main__':
     main()

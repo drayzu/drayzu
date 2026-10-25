@@ -16,15 +16,16 @@ def serve():
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv
 
-def scene_frames(chrome, piece, times, size=(960, 440), dsf=2):
-    """chrome: secuencia.Chrome. Returns RGB frames at `size`, rendered at dsf x and downsampled."""
+def scene_frames(chrome, piece, times, size=(960, 440), dsf=2, out_dir=None):
+    """chrome: secuencia.Chrome. Returns RGB frames at `size`, rendered at dsf x and downsampled.
+    With out_dir, writes them there as 0000.png, 0001.png... instead (big sizes do not fit in memory)."""
     srv = serve()
     try:
         w, h = size
         chrome.call('Emulation.setDeviceMetricsOverride', width=w, height=h, deviceScaleFactor=dsf, mobile=False)
         chrome.call('Page.navigate', url=f'http://127.0.0.1:{srv.server_address[1]}{PAGE}?pieza={piece}')
         import time
-        for _ in range(300):
+        for _ in range(900):
             if chrome.js('window.sceneReady === true'):
                 break
             time.sleep(.1)
@@ -35,7 +36,12 @@ def scene_frames(chrome, piece, times, size=(960, 440), dsf=2):
             chrome.js(f'window.renderAt({t}); new Promise(r => requestAnimationFrame(() => r(true)))')
             shot = chrome.call('Page.captureScreenshot', format='png')
             im = Image.open(io.BytesIO(base64.b64decode(shot['data']))).convert('RGB')
-            out.append(im.resize(size, Image.LANCZOS) if im.size != size else im)
+            im = im.resize(size, Image.LANCZOS) if im.size != size else im
+            if out_dir:
+                im.save(os.path.join(out_dir, f'{len(out):04d}.png'), compress_level=1)
+                out.append(None)
+            else:
+                out.append(im)
         return out
     finally:
         srv.shutdown()
