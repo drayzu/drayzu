@@ -2,7 +2,7 @@
 
     python tools/secuencia.py        ->  media/serie.avif, serie.webp and link-*.svg (the published README)
 
-Potencias and Tiempo play their own hero clips; AstroIngeniería and Civilización are WebGL scenes
+Potencias, AstroIngeniería and Tiempo play footage of their own sites; Civilización is a WebGL scene
 (tools/escenas/escena.html, after the engine of drayzu.github.io/prototypes/vuelo.html)
 rendered frame by frame with headless Chrome at 30 fps (cached in tools/src/escenas; --fresh recaptures them all, --fresh tiempo just that one).
 Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/serie.avif), with a
@@ -155,19 +155,14 @@ def chrome_layer(active, progress):
     d.text(z(36, H - 30), p['tagline'], font=italic_h, fill=B.rgba(INK, .72), anchor='ls')
     py0, py1, px1 = H - 104, H - 48, W - 36
     if p['live']:
-        pw = round(52 + mono_p.getlength(p['url']) / Z + 150)
-        px0 = px1 - pw
-        d.rounded_rectangle(z(px0, py0, px1, py1), radius=round(28 * Z), fill=B.rgba(BG), outline=B.rgba(INK, .3), width=w1)
+        # Only the address, quietly: an image on GitHub is a single link, so no button here pretends
+        # to be one (the real links are the pills under the sequence).
         ay = (py0 + py1) / 2
-        d.line(z(px0 + 24, ay, px0 + 38, ay), fill=B.rgba(c), width=w2)
-        d.line(z(px0 + 32, ay - 5, px0 + 38, ay, px0 + 32, ay + 5), fill=B.rgba(c), width=w2, joint='curve')
-        d.text(z(px0 + 50, ay + 5), p['url'], font=mono_p, fill=B.rgba(INK), anchor='ls')
-        bx0, bx1 = px1 - 124, px1 - 11
-        d.rounded_rectangle(z(bx0, py0 + 11, bx1, py1 - 11), radius=round(17 * Z), fill=B.rgba(c))
-        spaced(d, (bx0 + 17, ay + 5), 'ENTER', mono, B.rgba('#0d0b0a'), 1.5)
-        kx, ky = bx1 - 32, ay + 3
-        d.line(z(kx + 10, ky - 7, kx + 10, ky, kx, ky), fill=B.rgba('#0d0b0a'), width=w2, joint='curve')
-        d.line(z(kx + 4, ky - 4, kx, ky, kx + 4, ky + 4), fill=B.rgba('#0d0b0a'), width=w2, joint='curve')
+        tw = mono_p.getlength(p['url']) / Z
+        x0 = px1 - tw - 22
+        d.line(z(x0, ay, x0 + 13, ay), fill=B.rgba(c, .8), width=w2)
+        d.line(z(x0 + 8, ay - 5, x0 + 13, ay, x0 + 8, ay + 5), fill=B.rgba(c, .8), width=w2, joint='curve')
+        d.text(z(x0 + 22, ay + 5), p['url'], font=mono_p, fill=B.rgba(INK, .55), anchor='ls')
     else:
         label = 'IN PROGRESS'
         pw = round(mono.getlength(label) / Z + 3 * len(label) + 64)
@@ -225,6 +220,42 @@ def tiempo_media(first=24, last=312):
             fr = Image.blend(fr, DARK, (i - (last - fade)) / (fade + 1))
         return fr
     return [((lambda i=i: load(i)), 1000 / SCENE_FPS) for i in range(first, last + 1)]
+
+def footage(load_rgb, count, fade_in=0):
+    """Real footage (RGB frames at 30 fps), cropped to the media box and screened over the card."""
+    fade = round(SCENE_FPS * .27)
+    def load(i):
+        fr = load_rgb(i)
+        h = round(fr.width * MH / MW)
+        if h <= fr.height:
+            y0 = (fr.height - h) // 2
+            fr = fr.crop((0, y0, fr.width, y0 + h))
+        else:
+            w = round(fr.height * MW / MH)
+            x0 = (fr.width - w) // 2
+            fr = fr.crop((x0, 0, x0 + w, fr.height))
+        fr = ImageChops.screen(fr.resize((MWp, MHp), Image.LANCZOS), DARK)
+        if i >= count - fade:
+            fr = Image.blend(fr, DARK, (i - (count - fade) + 1) / (fade + 1))
+        return fr
+    return [((lambda i=i: load(i)), 1000 / SCENE_FPS) for i in range(count)]
+
+def potencias_media():
+    """Potencias' README hero, from its captured frames (one scroll: a cell to the Earth)."""
+    d = r'E:/Proyectos/ChatGPT/potencias/tools/src/frames/hero'
+    return footage(lambda i: Image.open(os.path.join(d, f'{i:04d}.jpg')).convert('RGB'), 270)
+
+def astro_media(seconds=5.2):
+    """AstroIngeniería's own opening, the part before its interface appears: the flight through a nebula
+    to the birth of a star (from the original recording, 1260 x 540 at 60 fps)."""
+    src = r'E:/Proyectos/ChatGPT/Astroingenieria-readme-archive/docs-readme-intros/intro-principal.mp4'
+    folder = os.path.join(HERE, 'src', 'astro-intro')
+    n = round(seconds * SCENE_FPS)
+    if not os.path.isdir(folder) or len(os.listdir(folder)) < n:
+        os.makedirs(folder, exist_ok=True)
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', src, '-t', str(seconds), '-vf', f'fps={SCENE_FPS}', '-q:v', '2',
+                        os.path.join(folder, '%04d.jpg')], check=True)
+    return footage(lambda i: Image.open(os.path.join(folder, f'{i + 1:04d}.jpg')).convert('RGB'), n)
 
 def scene_media(chrome, piece, seconds, fresh=False):
     """The WebGL scenes in tools/escenas/escena.html, captured once into tools/src/escenas/ (a PNG per frame)."""
@@ -292,8 +323,8 @@ def main():
     print('capturing scenes...')
     chrome = Chrome()
     try:
-        media = [live_media('potencias'),
-                 scene_media(chrome, 'astroingenieria', 9.0, fresh),
+        media = [potencias_media(),
+                 astro_media(),
                  tiempo_media(),
                  scene_media(chrome, 'civilizacion', 9.0, fresh)]
     finally:
