@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONTS = os.path.join(ROOT, 'tools', 'fonts')
 OUT = os.path.join(ROOT, 'tools', 'versiones', 'tarjetas', 'media')
 
-SERIES = 'ESCALAS'
+SERIES = 'HORIZONTES'
 
 THEMES = {
     'dark': dict(ink='#ece7db', bg='#0d1117', panel='#0d1117',
@@ -79,13 +79,13 @@ TWINKLE = '.tw{animation:tw ease-in-out infinite alternate}@keyframes tw{from{op
 
 # ------------------------------------------------------------------ header: title + the series as a line of stations
 STATIONS = [  # (accent key, name, axis, live)
-    ('pot', 'Espacio', 'where? · metres', True),
-    ('time', 'Tiempo', 'when? · years', True),
-    ('civ', 'Destino', 'how far? · energy', False),
-    ('inf', 'Infinito', 'beyond? · numbers', False),
+    ('pot', 'Espacio', 'where?', True),
+    ('time', 'Tiempo', 'when?', True),
+    ('civ', 'Destino', 'how far?', False),
+    ('inf', 'Infinito', "what's beyond?", False),
 ]
 
-HEADLINE = ('How small, how brief, how far', 'Interactive pieces about the universe, and our place in it.')
+HEADLINE = ('Everything, from here.', 'Interactive pieces about the universe, and our place in it.')
 
 def header(t, headline=HEADLINE):
     title, sub = headline
@@ -122,7 +122,7 @@ def header(t, headline=HEADLINE):
         else:
             b.append(f'<circle class="ring" cx="{x}" cy="{ly}" r="7" fill="none" stroke="{c}"/>'
                      f'<circle cx="{x}" cy="{ly}" r="6.5" fill="{t["bg"]}" stroke="{c}" stroke-width="2"/>')
-        soon = '' if live else ' · SOON'
+        soon = ''  # an open circle already says it is not out yet
         b.append(f'<text x="{x}" y="{ly + 46}" text-anchor="middle" font-family="S,serif" font-size="28" fill="{ink}" '
                  f'fill-opacity="{1 if live else .65}">{name}</text>'
                  f'<text x="{x}" y="{ly + 72}" text-anchor="middle" font-family="M,monospace" font-size="11.5" letter-spacing="1.5" fill="{c}">'

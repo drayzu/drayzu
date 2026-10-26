@@ -2,7 +2,7 @@
 
     python tools/secuencia.py        ->  media/serie.avif, serie.webp and link-*.svg (the published README)
 
-Espacio and Tiempo play footage of their own sites; Destino is a WebGL scene in the same language (Infinito has no media yet)
+Espacio and Tiempo play footage of their own sites; Destino and Infinito are WebGL scenes in the same language
 (tools/escenas/escena.html, after the engine of drayzu.github.io/prototypes/vuelo.html)
 rendered frame by frame with headless Chrome at 30 fps (cached in tools/src/escenas; --fresh recaptures them all, --fresh tiempo just that one).
 Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/serie.avif), with a
@@ -30,7 +30,7 @@ MXp, MYp, MWp, MHp = (round(v * Z) for v in (MX, MY, MW, MH))
 SCENE_FPS = 30
 TICK = 60                                  # frames are fed to ffmpeg on a 60 per second clock
 XFADE_S = .45                              # seconds of crossfade between pieces
-AVIF_CRF, AVIF_PRESET = 34, 5
+AVIF_CRF, AVIF_PRESET = 35, 5
 WEBP_W, WEBP_Q = 920, 55                   # fallback for browsers without AVIF
 
 # ------------------------------------------------------------------ headless chrome
@@ -104,6 +104,7 @@ PIECES = [  # station index, title, tagline, live (the Atlas, the series' librar
     dict(i=0, title='Espacio', tagline='Everything is made of something smaller.', live=True, url='drayzu.github.io/Espacio'),
     dict(i=1, title='Tiempo', tagline='From before the Big Bang to the last light.', live=True, url='drayzu.github.io/Tiempo'),
     dict(i=2, title='Destino', tagline='Watch a civilization outgrow its planet.', live=False),
+    dict(i=3, title='Infinito', tagline='What no ruler can reach.', live=False),
 ]
 
 def chrome_layer(active, progress):
@@ -144,7 +145,7 @@ def chrome_layer(active, progress):
     for k, (key, name, axis, live) in enumerate(B.STATIONS):
         on = k == active
         d.text(z(XS[k], LY + 42), name, font=serif_n, fill=B.rgba(INK, .95 if on else .4), anchor='ms')
-        spaced(d, (XS[k], LY + 62), axis.upper() + ('' if live else ' · SOON'), mono_s,
+        spaced(d, (XS[k], LY + 62), axis.upper(), mono_s,
                B.rgba(T[key], 1 if on else .45), 1.5, 'm')
     # caption under the media
     p = PIECES[active]
@@ -297,6 +298,16 @@ def link_pill(t, key, name):
             f'<path d="M546,46h16M556,40l6,6l-6,6" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>')
     return B.svg(W_, H_, f'Enter {name}', '', body)
 
+def atlas_note(t):
+    """The Atlas, quietly: a small caption under the pieces, not a piece itself (it is the series' library)."""
+    ink, c = t['ink'], t['astro']
+    text = 'AND TO READ FURTHER, THE ATLAS →'
+    w = len(text) * 10.8  # Geist Mono at 13 px with 3 px of letter spacing
+    x0 = 600 - (w + 16) / 2
+    body = (f'<circle cx="{x0 + 3.5:.1f}" cy="25" r="3.5" fill="{c}"/>'
+            f'<text x="{x0 + 16:.1f}" y="30" font-family="M,monospace" font-size="13" letter-spacing="3" fill="{ink}" fill-opacity=".55">{text}</text>')
+    return B.svg(1200, 50, 'And to read further, the Atlas, the library of the series', '', body)
+
 # ------------------------------------------------------------------ compose
 def encode_avif(dst):
     """ffmpeg reads raw frames on a 60 per second clock (each frame repeated for its duration); the repeats are
@@ -315,7 +326,8 @@ def main():
     fresh = (names or True) if '--fresh' in args else False
     os.makedirs(os.path.join(OUT, 'media'), exist_ok=True)
     for th, t in B.THEMES.items():
-        for key, slug, name in (('pot', 'espacio', 'Espacio'), ('time', 'tiempo', 'Tiempo'), ('astro', 'atlas', 'Atlas · the library')):
+        open(os.path.join(OUT, 'media', f'atlas-note-{th}.svg'), 'w', encoding='utf-8').write(atlas_note(t))
+        for key, slug, name in (('pot', 'espacio', 'Espacio'), ('time', 'tiempo', 'Tiempo')):
             open(os.path.join(OUT, 'media', f'link-{slug}-{th}.svg'), 'w', encoding='utf-8').write(link_pill(t, key, name))
         for key, slug, name in (('civ', 'destino', 'Destino'), ('inf', 'infinito', 'Infinito')):
             open(os.path.join(OUT, 'media', f'soon-{slug}-{th}.svg'), 'w', encoding='utf-8').write(soon_pill(t, key, name))
@@ -324,7 +336,8 @@ def main():
     try:
         media = [espacio_media(),
                  tiempo_media(),
-                 scene_media(chrome, 'civ2', 9.0, fresh)]
+                 scene_media(chrome, 'civ2', 9.0, fresh),
+                 scene_media(chrome, 'infinito', 10.5, fresh)]
     finally:
         chrome.close()
 
