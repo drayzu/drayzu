@@ -2,7 +2,7 @@
 
     python tools/secuencia.py        ->  media/serie.avif, serie.webp and link-*.svg (the published README)
 
-Potencias and Tiempo play footage of their own sites; AstroIngeniería and Civilización are WebGL scenes in the same language
+Espacio (Space) and Tiempo (Time) play footage of their own sites; Destino (Destiny) is a WebGL scene in the same language
 (tools/escenas/escena.html, after the engine of drayzu.github.io/prototypes/vuelo.html)
 rendered frame by frame with headless Chrome at 30 fps (cached in tools/src/escenas; --fresh recaptures them all, --fresh tiempo just that one).
 Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/serie.avif), with a
@@ -97,14 +97,13 @@ def spaced(d, xy, text, font, fill, sp=0.0, anchor='l'):
         x += font.getlength(c) + sp
     return x
 
-XS = [170, 390, 610, 830]
+XS = [200, 500, 800]
 LY = 236
 
-PIECES = [  # station index, title, tagline, live
-    dict(i=0, title='Potencias', tagline='Everything is made of something smaller.', live=True, url='drayzu.github.io/Potencias'),
-    dict(i=1, title='AstroIngeniería', tagline='From orbital habitats to rebuilt stars.', live=True, url='drayzu.github.io/AstroIngenieria'),
-    dict(i=2, title='Tiempo', tagline='From before the Big Bang to the last light.', live=True, url='drayzu.github.io/Tiempo'),
-    dict(i=3, title='Civilización', tagline='Watch a civilization outgrow its planet.', live=False),
+PIECES = [  # station index, title, tagline, live (the Atlas, the series' library, is a link under the sequence)
+    dict(i=0, title='Space', tagline='Everything is made of something smaller.', live=True, url='drayzu.github.io/Espacio'),
+    dict(i=1, title='Time', tagline='From before the Big Bang to the last light.', live=True, url='drayzu.github.io/Tiempo'),
+    dict(i=2, title='Destiny', tagline='Watch a civilization outgrow its planet.', live=False),
 ]
 
 def chrome_layer(active, progress):
@@ -120,8 +119,8 @@ def chrome_layer(active, progress):
     last_live = max(k for k, s in enumerate(B.STATIONS) if s[3])
     d.line(r(XS[0], LY, XS[last_live], LY), fill=B.rgba(INK, .32), width=lw)
     x = XS[last_live]
-    while x < XS[3]:
-        d.line(r(x, LY, min(x + 3, XS[3]), LY), fill=B.rgba(INK, .28), width=lw)
+    while x < XS[-1]:
+        d.line(r(x, LY, min(x + 3, XS[-1]), LY), fill=B.rgba(INK, .28), width=lw)
         x += 9
     for k, (key, name, axis, live) in enumerate(B.STATIONS):
         c = T[key]
@@ -240,8 +239,8 @@ def footage(load_rgb, count, fade_in=0):
         return fr
     return [((lambda i=i: load(i)), 1000 / SCENE_FPS) for i in range(count)]
 
-def potencias_media():
-    """Potencias' README hero, from its captured frames (one scroll: a cell to the Earth)."""
+def espacio_media():
+    """Espacio's README hero, from its captured frames (one scroll: a cell to the Earth)."""
     d = r'E:/Proyectos/ChatGPT/potencias/tools/src/frames/hero'
     return footage(lambda i: Image.open(os.path.join(d, f'{i:04d}.jpg')).convert('RGB'), 270)
 
@@ -316,14 +315,13 @@ def main():
     fresh = (names or True) if '--fresh' in args else False
     os.makedirs(os.path.join(OUT, 'media'), exist_ok=True)
     for th, t in B.THEMES.items():
-        for key, slug, name in (('pot', 'potencias', 'Potencias'), ('astro', 'astroingenieria', 'AstroIngeniería'), ('time', 'tiempo', 'Tiempo')):
+        for key, slug, name in (('pot', 'espacio', 'Space'), ('time', 'tiempo', 'Time'), ('astro', 'atlas', 'Atlas · the library')):
             open(os.path.join(OUT, 'media', f'link-{slug}-{th}.svg'), 'w', encoding='utf-8').write(link_pill(t, key, name))
-        open(os.path.join(OUT, 'media', f'soon-civilizacion-{th}.svg'), 'w', encoding='utf-8').write(soon_pill(t, 'civ', 'Civilización'))
+        open(os.path.join(OUT, 'media', f'soon-destino-{th}.svg'), 'w', encoding='utf-8').write(soon_pill(t, 'civ', 'Destiny'))
     print('capturing scenes...')
     chrome = Chrome()
     try:
-        media = [potencias_media(),
-                 scene_media(chrome, 'astro2', 9.0, fresh),
+        media = [espacio_media(),
                  tiempo_media(),
                  scene_media(chrome, 'civ2', 9.0, fresh)]
     finally:

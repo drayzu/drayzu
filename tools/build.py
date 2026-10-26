@@ -79,10 +79,9 @@ TWINKLE = '.tw{animation:tw ease-in-out infinite alternate}@keyframes tw{from{op
 
 # ------------------------------------------------------------------ header: title + the series as a line of stations
 STATIONS = [  # (accent key, name, axis, live)
-    ('pot', 'Potencias', 'size', True),
-    ('astro', 'AstroIngeniería', 'what we could build', True),
-    ('time', 'Tiempo', 'time', True),
-    ('civ', 'Civilización', 'civilization', False),
+    ('pot', 'Space', 'where? · metres', True),
+    ('time', 'Time', 'when? · years', True),
+    ('civ', 'Destiny', 'how far? · energy', False),
 ]
 
 HEADLINE = ('How small, how brief, how far', 'Interactive pieces about the universe, and our place in it.')
