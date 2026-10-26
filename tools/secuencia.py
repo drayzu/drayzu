@@ -2,7 +2,7 @@
 
     python tools/secuencia.py        ->  media/serie.avif, serie.webp and link-*.svg (the published README)
 
-Espacio (Space) and Tiempo (Time) play footage of their own sites; Destino (Destiny) is a WebGL scene in the same language
+Espacio and Tiempo play footage of their own sites; Destino is a WebGL scene in the same language (Infinito has no media yet)
 (tools/escenas/escena.html, after the engine of drayzu.github.io/prototypes/vuelo.html)
 rendered frame by frame with headless Chrome at 30 fps (cached in tools/src/escenas; --fresh recaptures them all, --fresh tiempo just that one).
 Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/serie.avif), with a
@@ -97,13 +97,13 @@ def spaced(d, xy, text, font, fill, sp=0.0, anchor='l'):
         x += font.getlength(c) + sp
     return x
 
-XS = [200, 500, 800]
+XS = [170, 390, 610, 830]
 LY = 236
 
 PIECES = [  # station index, title, tagline, live (the Atlas, the series' library, is a link under the sequence)
-    dict(i=0, title='Space', tagline='Everything is made of something smaller.', live=True, url='drayzu.github.io/Espacio'),
-    dict(i=1, title='Time', tagline='From before the Big Bang to the last light.', live=True, url='drayzu.github.io/Tiempo'),
-    dict(i=2, title='Destiny', tagline='Watch a civilization outgrow its planet.', live=False),
+    dict(i=0, title='Espacio', tagline='Everything is made of something smaller.', live=True, url='drayzu.github.io/Espacio'),
+    dict(i=1, title='Tiempo', tagline='From before the Big Bang to the last light.', live=True, url='drayzu.github.io/Tiempo'),
+    dict(i=2, title='Destino', tagline='Watch a civilization outgrow its planet.', live=False),
 ]
 
 def chrome_layer(active, progress):
@@ -315,9 +315,10 @@ def main():
     fresh = (names or True) if '--fresh' in args else False
     os.makedirs(os.path.join(OUT, 'media'), exist_ok=True)
     for th, t in B.THEMES.items():
-        for key, slug, name in (('pot', 'espacio', 'Space'), ('time', 'tiempo', 'Time'), ('astro', 'atlas', 'Atlas · the library')):
+        for key, slug, name in (('pot', 'espacio', 'Espacio'), ('time', 'tiempo', 'Tiempo'), ('astro', 'atlas', 'Atlas · the library')):
             open(os.path.join(OUT, 'media', f'link-{slug}-{th}.svg'), 'w', encoding='utf-8').write(link_pill(t, key, name))
-        open(os.path.join(OUT, 'media', f'soon-destino-{th}.svg'), 'w', encoding='utf-8').write(soon_pill(t, 'civ', 'Destiny'))
+        for key, slug, name in (('civ', 'destino', 'Destino'), ('inf', 'infinito', 'Infinito')):
+            open(os.path.join(OUT, 'media', f'soon-{slug}-{th}.svg'), 'w', encoding='utf-8').write(soon_pill(t, key, name))
     print('capturing scenes...')
     chrome = Chrome()
     try:

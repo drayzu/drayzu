@@ -20,9 +20,9 @@ SERIES = 'ESCALAS'
 
 THEMES = {
     'dark': dict(ink='#ece7db', bg='#0d1117', panel='#0d1117',
-                 pot='#ff5b2e', astro='#e3c48a', time='#8fb4ff', civ='#6fe3c1'),
+                 pot='#ff5b2e', astro='#e3c48a', time='#8fb4ff', civ='#6fe3c1', inf='#c9b4ff'),
     'light': dict(ink='#1f1d1a', bg='#ffffff', panel='#ffffff',
-                  pot='#d6461c', astro='#9a7430', time='#3a64c8', civ='#1f8f73'),
+                  pot='#d6461c', astro='#9a7430', time='#3a64c8', civ='#1f8f73', inf='#6e4fc9'),
 }
 CARD = dict(THEMES['dark'], card='#0d1117')   # cards are dark in both themes
 
@@ -79,9 +79,10 @@ TWINKLE = '.tw{animation:tw ease-in-out infinite alternate}@keyframes tw{from{op
 
 # ------------------------------------------------------------------ header: title + the series as a line of stations
 STATIONS = [  # (accent key, name, axis, live)
-    ('pot', 'Space', 'where? · metres', True),
-    ('time', 'Time', 'when? · years', True),
-    ('civ', 'Destiny', 'how far? · energy', False),
+    ('pot', 'Espacio', 'where? · metres', True),
+    ('time', 'Tiempo', 'when? · years', True),
+    ('civ', 'Destino', 'how far? · energy', False),
+    ('inf', 'Infinito', 'beyond? · numbers', False),
 ]
 
 HEADLINE = ('How small, how brief, how far', 'Interactive pieces about the universe, and our place in it.')
