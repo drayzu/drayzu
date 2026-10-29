@@ -328,9 +328,10 @@ def espacio_media():
 
 DESTINO_FRAMES = r'E:/Proyectos/ChatGPT/civilizacion/tools/readme'
 
-def destino_media(clips=('hero1', 'hero4', 'hero5'), join=10):
-    """Destino's README hero (its own captured flights, 1840 x 1035 JPG at 30 fps): the swarm around the Sun,
-    a star being taken apart and the black hole, each fading into the next over `join` frames."""
+def destino_media(clips=('hero1', 'hero2', 'hero4'), join=10):
+    """Destino's README hero (its own captured flights, 1840 x 1035 JPG at 30 fps), the same as its cover: up
+    the space elevator, through the collectors around the Sun and into the shells of a mind around a star,
+    each fading into the next over `join` frames."""
     ns = [len([f for f in os.listdir(os.path.join(DESTINO_FRAMES, c)) if f.endswith('.jpg')]) for c in clips]
     seq = []
     for k, (c, n) in enumerate(zip(clips, ns)):
