@@ -2,9 +2,9 @@
 
     python tools/secuencia.py        ->  media/serie.avif, serie.webp and link-*.svg (the published README)
 
-Espacio and Tiempo play footage of their own sites; Destino and Infinito are WebGL scenes in the same language
-(tools/escenas/escena.html, after the engine of drayzu.github.io/prototypes/vuelo.html)
-rendered frame by frame with headless Chrome at 30 fps (cached in tools/src/escenas; --fresh recaptures them all, --fresh tiempo just that one).
+Every piece plays footage of its own site, from the frames each one records for its README.
+(The WebGL scenes in tools/escenas/escena.html, captured with headless Chrome by scene_media, stood in for the
+pieces before they were out; --fresh recaptures them.)
 Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/serie.avif), with a
 lighter WebP (media/serie.webp) for browsers without AVIF.
 """
@@ -16,6 +16,9 @@ B = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(B)
 
 from PIL import Image, ImageChops, ImageDraw
+import math
+import numpy as np
+from PIL import ImageFilter
 import websocket
 
 OUT = os.path.dirname(HERE)
@@ -74,14 +77,15 @@ class Chrome:
 def font(name, size):
     return B.pil_font(name, round(size * Z))
 
-mono = font('mono.woff2', 13)
-mono_s = font('mono.woff2', 11)
-mono_p = font('mono.woff2', 14)
+mono = font('mono.woff2', 14)
+mono_s = font('mono.woff2', 15)
+mono_k = font('mono.woff2', 15)
+mono_p = font('mono.woff2', 15)
 serif_t = font('serif.woff2', 66)
-serif_n = font('serif.woff2', 23)
+serif_n = font('serif.woff2', 25)
 serif_h = font('serif.woff2', 58)
 italic_s = font('serif-italic.woff2', 23)
-italic_h = font('serif-italic.woff2', 23)
+italic_h = font('serif-italic.woff2', 25)
 
 def spaced(d, xy, text, font, fill, sp=0.0, anchor='l'):
     """Letter-spaced text; xy and sp in layout units."""
@@ -101,11 +105,92 @@ XS = [170, 390, 610, 830]
 LY = 236
 
 PIECES = [  # station index, title, tagline, live (the Atlas, the series' library, is a link under the sequence)
-    dict(i=0, title='Espacio', tagline='Everything is made of something smaller.', live=True, url='drayzu.github.io/Espacio'),
+    dict(i=0, title='Espacio', tagline='From a quark to the edge of everything.', live=True, url='drayzu.github.io/Espacio'),
     dict(i=1, title='Tiempo', tagline='From before the Big Bang to the last light.', live=True, url='drayzu.github.io/Tiempo'),
-    dict(i=2, title='Destino', tagline='Watch a civilization outgrow its planet.', live=False),
-    dict(i=3, title='Infinito', tagline='What no ruler can reach.', live=False),
+    dict(i=2, title='Destino', tagline='From one thought to all we could ever build.', live=True, url='drayzu.github.io/Destino'),
+    dict(i=3, title='Infinito', tagline='Beyond the last thing we could know.', live=True, url='drayzu.github.io/Infinito'),
 ]
+
+class Header:
+    """The kicker, HORIZONTES cut by a line of light (the lower half of the letters dim, as if below the horizon)
+    and the line under it, drawn per frame over the top of the card: at the start of each loop the line lights up
+    and the letters rise one by one from behind it, then the line; afterwards a slow glint runs along it now and then."""
+    SIZE, SP, BASE = 80, 20, 142           # title, in layout units
+    LINE_X = (30, 970)
+    TAG = ('Everything, from here.', 24, .72, 184)  # text, size, opacity, baseline
+    GLINT_EVERY, GLINT_S, GLINT_W = 9.0, 2.6, 60
+
+    def __init__(self):
+        self.f = font('serif.woff2', self.SIZE)
+        self.cap = -self.f.getbbox('H', anchor='ls')[1] / Z
+        self.hy = self.BASE - self.cap * .30
+        self.HH = round(205 * Z)
+        Y, depth = round(self.hy * Z), round(self.cap * .45 * Z)
+        rows = np.zeros(self.HH, np.float32)
+        rows[:Y] = 1
+        k = np.arange(depth)
+        rows[Y:Y + depth] = .32 * (1 - k / depth) ** 1.4
+        self.rows = rows[:, None]
+        xs = []
+        x = W / 2 - (sum(self.f.getlength(c) / Z + self.SP for c in B.SERIES) - self.SP) / 2
+        for c in B.SERIES:
+            xs.append(x)
+            x += self.f.getlength(c) / Z + self.SP
+        self.xs = xs
+        # the line and its glow, as alpha maps
+        line = Image.new('L', (CW, self.HH), 0)
+        d = ImageDraw.Draw(line)
+        X0, X1 = round(self.LINE_X[0] * Z), round(self.LINE_X[1] * Z)
+        for px in range(X0, X1):
+            v = math.sin(math.pi * (px - X0) / (X1 - X0)) ** 1.6
+            d.line((px, Y, px, Y + max(1, round(Z * .9)) - 1), fill=round(255 * v))
+        glow = line.filter(ImageFilter.GaussianBlur(9 * Z)).point(lambda p: min(255, p * 3))
+        self.line = np.asarray(line, np.float32) / 255
+        self.glow = np.asarray(glow, np.float32) / 255 * .55
+        self.xu = np.arange(CW, dtype=np.float32) / Z
+        self.ink = np.array(B.rgba(INK)[:3], np.float32)
+        self.static = None
+
+    @staticmethod
+    def ease(u):
+        u = min(1.0, max(0.0, u))
+        return 1 - (1 - u) ** 3
+
+    def letters(self, t):
+        rise = [self.ease((t - .4 - i * .09) / 1.1) for i in range(len(B.SERIES))]
+        if min(rise) >= 1 and self.static is not None:
+            return self.static
+        im = Image.new('L', (CW, self.HH), 0)
+        d = ImageDraw.Draw(im)
+        for x, c, r in zip(self.xs, B.SERIES, rise):
+            d.text((round(x * Z), round((self.BASE + (1 - r) * (self.cap + 6)) * Z)), c, font=self.f, fill=255, anchor='ls')
+        a = np.asarray(im, np.float32) / 255 * self.rows
+        if min(rise) >= 1:
+            self.static = a
+        return a
+
+    def draw(self, fr, t, tg):
+        """fr: the frame (RGB, modified in place); t: seconds since the loop began; tg: the same, for the glint."""
+        top = np.asarray(fr.crop((0, 0, CW, self.HH)), np.float32)
+        def over(a):
+            nonlocal top
+            top = top * (1 - a[..., None]) + self.ink * a[..., None]
+        g = np.full(CW, .9 * self.ease(t / .6), np.float32)
+        u = (tg % self.GLINT_EVERY) / self.GLINT_S
+        if 0 < u < 1 and tg > self.GLINT_EVERY / 2:
+            gx = self.LINE_X[0] + (self.LINE_X[1] - self.LINE_X[0]) * u
+            g = g + 1.1 * np.sin(math.pi * u) * np.exp(-((self.xu - gx) / self.GLINT_W) ** 2)
+        over(np.clip(self.glow * g, 0, 1))
+        over(np.clip(self.line * g, 0, 1))
+        over(self.letters(t))
+        fr.paste(Image.fromarray(top.round().astype(np.uint8)), (0, 0))
+        d = ImageDraw.Draw(fr)
+        spaced(d, (W / 2, 46), 'DRAYZU · A SERIES', mono_k, B.rgba(INK, .6), 4.5, 'm')
+        text, size, alpha, y = self.TAG
+        a = self.ease((t - 2.3) / .9)
+        if a > 0:
+            d.text((round(W / 2 * Z), round(y * Z)), text, font=font('serif-italic.woff2', size), fill=B.rgba(INK, alpha * a), anchor='ms')
+        return fr
 
 def chrome_layer(active, progress):
     """Everything but the media: header, the line of stations (active one lit, with a progress ring) and the caption."""
@@ -138,21 +223,17 @@ def chrome_layer(active, progress):
     d = ImageDraw.Draw(im)
     def z(*v):
         return tuple(round(x * Z) for x in v)
-    spaced(d, (W / 2, 62), f'DRAYZU · {B.SERIES} · A SERIES', mono, B.rgba(INK, .45), 5.5, 'm')
-    title, sub = B.HEADLINE
-    d.text(z(W / 2, 140), title, font=serif_t, fill=B.rgba(INK), anchor='ms')
-    d.text(z(W / 2, 180), sub, font=italic_s, fill=B.rgba(INK, .72), anchor='ms')
     for k, (key, name, axis, live) in enumerate(B.STATIONS):
         on = k == active
-        d.text(z(XS[k], LY + 42), name, font=serif_n, fill=B.rgba(INK, .95 if on else .4), anchor='ms')
-        spaced(d, (XS[k], LY + 62), axis.upper(), mono_s,
-               B.rgba(T[key], 1 if on else .45), 1.5, 'm')
+        d.text(z(XS[k], LY + 44), name, font=serif_n, fill=B.rgba(INK, .95 if on else .6), anchor='ms')
+        if on:  # only the piece on screen asks its question
+            spaced(d, (XS[k], LY + 68), axis.upper(), mono_s, B.rgba(T[key]), 1.5, 'm')
     # caption under the media
     p = PIECES[active]
     c = T[B.STATIONS[active][0]]
     w1, w2 = max(1, round(Z)), max(2, round(2 * Z))
     d.text(z(32, H - 66), p['title'], font=serif_h, fill=B.rgba(INK), anchor='ls')
-    d.text(z(36, H - 30), p['tagline'], font=italic_h, fill=B.rgba(INK, .72), anchor='ls')
+    d.text(z(36, H - 30), p['tagline'], font=italic_h, fill=B.rgba(INK, .8), anchor='ls')
     py0, py1, px1 = H - 104, H - 48, W - 36
     if p['live']:
         # Only the address, quietly: an image on GitHub is a single link, so no button here pretends
@@ -165,13 +246,13 @@ def chrome_layer(active, progress):
         d.text(z(x0 + 22, ay + 5), p['url'], font=mono_p, fill=B.rgba(INK, .55), anchor='ls')
     else:
         label = 'IN PROGRESS'
-        pw = round(mono.getlength(label) / Z + 3 * len(label) + 64)
+        pw = round(mono.getlength(label) / Z + 2 * len(label) + 64)
         px0 = px1 - pw
         d.rounded_rectangle(z(px0, py0, px1, py1), radius=round(28 * Z), fill=B.rgba(BG), outline=B.rgba(INK, .22), width=w1)
         ay = (py0 + py1) / 2
         d.ellipse(z(px0 + 24, ay - 4, px0 + 32, ay + 4), fill=B.rgba(c))
-        spaced(d, (px0 + 44, ay + 5), label, mono, B.rgba(INK, .6), 3)
-    return im.convert('RGB')
+        spaced(d, (px0 + 44, ay + 5), label, mono, B.rgba(INK, .7), 2)
+    return Image.alpha_composite(Image.new('RGBA', im.size, B.rgba(BG)), im).convert('RGB')  # the corners outside the card are the page
 
 def feather():
     mask = Image.new('L', (MWp, MHp), 255)
@@ -245,6 +326,34 @@ def espacio_media():
     d = r'E:/Proyectos/ChatGPT/potencias/tools/src/frames/hero'
     return footage(lambda i: Image.open(os.path.join(d, f'{i:04d}.jpg')).convert('RGB'), 270)
 
+DESTINO_FRAMES = r'E:/Proyectos/ChatGPT/civilizacion/tools/readme'
+
+def destino_media(clips=('hero1', 'hero4', 'hero5'), join=10):
+    """Destino's README hero (its own captured flights, 1840 x 1035 JPG at 30 fps): the swarm around the Sun,
+    a star being taken apart and the black hole, each fading into the next over `join` frames."""
+    ns = [len([f for f in os.listdir(os.path.join(DESTINO_FRAMES, c)) if f.endswith('.jpg')]) for c in clips]
+    seq = []
+    for k, (c, n) in enumerate(zip(clips, ns)):
+        start = join if k else 0
+        last = k == len(clips) - 1
+        for i in range(start, n if last else n - join):
+            seq.append(((c, i), None, 0))
+        if not last:
+            for i in range(join):
+                seq.append(((c, n - join + i), (clips[k + 1], i), (i + 1) / (join + 1)))
+    img = lambda ci: Image.open(os.path.join(DESTINO_FRAMES, ci[0], f'{ci[1]:04d}.jpg')).convert('RGB')
+    def rgb(i):
+        a, b, w = seq[i]
+        return Image.blend(img(a), img(b), w) if b else img(a)
+    return footage(rgb, len(seq))
+
+def infinito_media():
+    """Infinito's README hero (tools/readme/hero, 1840 x 1035 JPG at 30 fps): a point of light becomes the thread
+    of your life, splits at every choice and grows into the tree of all your lives."""
+    d = r'E:/Proyectos/ChatGPT/infinito/tools/readme/hero'
+    n = len([f for f in os.listdir(d) if f.endswith('.jpg')])
+    return footage(lambda i: Image.open(os.path.join(d, f'{i:04d}.jpg')).convert('RGB'), n)
+
 def astro_media():
     """AstroIngeniería's Dyson sphere being built, recorded from its own site with the interface hidden
     (tools/escenas/astro_dyson.py: 3200 x 1720 PNG at 30 fps). The site keeps the sphere high, so the
@@ -281,32 +390,30 @@ def scene_media(chrome, piece, seconds, fresh=False):
 def soon_pill(t, key, name):
     """A piece still in the works: the same pill, quieter, with no way in yet."""
     ink, c = t['ink'], t[key]
-    body = (f'<rect x="20" y="16" width="560" height="60" rx="30" fill="{t["panel"]}" stroke="{ink}" stroke-opacity=".18" stroke-dasharray="3 5"/>'
-            f'<circle cx="54" cy="46" r="5.5" fill="none" stroke="{c}" stroke-width="2"/>'
-            f'<text x="76" y="56" font-family="S,serif" font-size="28" fill="{ink}" fill-opacity=".55">{name}</text>'
-            f'<text x="556" y="51" text-anchor="end" font-family="M,monospace" font-size="13" letter-spacing="2" fill="{c}" fill-opacity=".8">SOON</text>')
+    body = (f'<rect x="20" y="16" width="560" height="60" rx="30" fill="{t["panel"]}" stroke="{ink}" stroke-opacity=".22" stroke-dasharray="3 5"/>'
+            f'<circle cx="54" cy="46" r="6" fill="none" stroke="{c}" stroke-width="2"/>'
+            f'<text x="76" y="56" font-family="S,serif" font-size="30" fill="{ink}" fill-opacity=".7">{name}</text>'
+            f'<text x="556" y="52" text-anchor="end" font-family="M,monospace" font-size="16" letter-spacing="1.5" fill="{c}" fill-opacity=".9">SOON</text>')
     return B.svg(600, 92, f'{name}: coming soon', '', body)
 
 def link_pill(t, key, name):
-    W_, H_ = 600, 92
     ink, c = t['ink'], t[key]
-    w = 560
-    body = (f'<rect x="20" y="16" width="{w}" height="60" rx="30" fill="{t["panel"]}" stroke="{ink}" stroke-opacity=".3"/>'
-            f'<circle cx="54" cy="46" r="6" fill="{c}"/>'
-            f'<text x="76" y="56" font-family="S,serif" font-size="28" fill="{ink}">{name}</text>'
-            f'<text x="536" y="51" text-anchor="end" font-family="M,monospace" font-size="13" letter-spacing="2" fill="{ink}" fill-opacity=".6">ENTER</text>'
-            f'<path d="M546,46h16M556,40l6,6l-6,6" fill="none" stroke="{c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>')
-    return B.svg(W_, H_, f'Enter {name}', '', body)
+    body = (f'<rect x="20" y="16" width="560" height="60" rx="30" fill="{t["panel"]}" stroke="{ink}" stroke-opacity=".3"/>'
+            f'<circle cx="54" cy="46" r="6.5" fill="{c}"/>'
+            f'<text x="76" y="56" font-family="S,serif" font-size="30" fill="{ink}">{name}</text>'
+            f'<text x="532" y="52" text-anchor="end" font-family="M,monospace" font-size="16" letter-spacing="1.5" fill="{ink}" fill-opacity=".8">ENTER</text>'
+            f'<path d="M542,46h18M553,39l7,7l-7,7" fill="none" stroke="{c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>')
+    return B.svg(600, 92, f'Enter {name}', '', body)
 
 def atlas_note(t):
     """The Atlas, quietly: a small caption under the pieces, not a piece itself (it is the series' library)."""
     ink, c = t['ink'], t['astro']
-    text = 'AND TO READ FURTHER, THE ATLAS →'
-    w = len(text) * 10.8  # Geist Mono at 13 px with 3 px of letter spacing
-    x0 = 600 - (w + 16) / 2
-    body = (f'<circle cx="{x0 + 3.5:.1f}" cy="25" r="3.5" fill="{c}"/>'
-            f'<text x="{x0 + 16:.1f}" y="30" font-family="M,monospace" font-size="13" letter-spacing="3" fill="{ink}" fill-opacity=".55">{text}</text>')
-    return B.svg(1200, 50, 'And to read further, the Atlas, the library of the series', '', body)
+    text = 'And to read further, the Atlas →'
+    w = B.pil_font('serif-italic.woff2', 26).getlength(text)
+    x0 = 600 - (w + 18) / 2
+    body = (f'<circle cx="{x0 + 4:.1f}" cy="29" r="4" fill="{c}"/>'
+            f'<text x="{x0 + 18:.1f}" y="38" font-family="I,serif" font-style="italic" font-size="26" fill="{ink}" fill-opacity=".8">{text}</text>')
+    return B.svg(1200, 58, 'And to read further, the Atlas, the library of the series', '', body)
 
 # ------------------------------------------------------------------ compose
 def encode_avif(dst):
@@ -327,40 +434,33 @@ def main():
     os.makedirs(os.path.join(OUT, 'media'), exist_ok=True)
     for th, t in B.THEMES.items():
         open(os.path.join(OUT, 'media', f'atlas-note-{th}.svg'), 'w', encoding='utf-8').write(atlas_note(t))
-        for key, slug, name in (('pot', 'espacio', 'Espacio'), ('time', 'tiempo', 'Tiempo')):
+        for key, slug, name in (('pot', 'espacio', 'Espacio'), ('time', 'tiempo', 'Tiempo'),
+                                ('civ', 'destino', 'Destino'), ('inf', 'infinito', 'Infinito')):
             open(os.path.join(OUT, 'media', f'link-{slug}-{th}.svg'), 'w', encoding='utf-8').write(link_pill(t, key, name))
-        for key, slug, name in (('civ', 'destino', 'Destino'), ('inf', 'infinito', 'Infinito')):
-            open(os.path.join(OUT, 'media', f'soon-{slug}-{th}.svg'), 'w', encoding='utf-8').write(soon_pill(t, key, name))
-    print('capturing scenes...')
-    chrome = Chrome()
-    try:
-        media = [espacio_media(),
-                 tiempo_media(),
-                 scene_media(chrome, 'civ2', 9.0, fresh),
-                 scene_media(chrome, 'infinito', 10.5, fresh)]
-    finally:
-        chrome.close()
+    media = [espacio_media(), tiempo_media(), destino_media(), infinito_media()]
 
-    def compose(k, img, progress, cache):
+    head = Header()
+    def compose(k, img, progress, cache, t=99.0, tg=0.0):
         step = round(24 * progress)
         if step not in cache:
             cache.clear()
             cache[step] = chrome_layer(k, step / 24)
         fr = cache[step].copy()
         fr.paste(img, (MXp, MYp), MASK)
-        return fr
+        return head.draw(fr, t, tg)
 
     print('composing...')
     avif = os.path.join(OUT, 'media', 'serie.avif')
     enc = encode_avif(avif)
     last = compose(len(media) - 1, media[-1][-1][0](), 1, {})  # the loop crossfades from the end back to the start
     webp, webp_durs = [], []
+    t0 = 0  # ms since the loop began
     for k, seq in enumerate(media):
         total = sum(ms for _, ms in seq)
         cache, t, prev, wt = {}, 0, last, 0
         xf = round(XFADE_S * 1000 / seq[0][1])
         for i, (load, ms) in enumerate(seq):
-            fr = compose(k, load(), t / total, cache)
+            fr = compose(k, load(), t / total, cache, (t0 + t) / 1000, (t0 + t) / 1000)
             if i < xf:
                 fr = Image.blend(prev, fr, (i + 1) / (xf + 1))
             ticks = round((t + ms) * TICK / 1000) - round(t * TICK / 1000)
@@ -374,6 +474,7 @@ def main():
             webp_durs[-1] += ms
             t += ms
             last = fr
+        t0 += total
         print(f'  {PIECES[k]["title"]}: {len(seq)} frames')
     enc.stdin.close()
     enc.wait()

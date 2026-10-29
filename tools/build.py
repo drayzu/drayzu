@@ -27,7 +27,7 @@ THEMES = {
 CARD = dict(THEMES['dark'], card='#0d1117')   # cards are dark in both themes
 
 # ------------------------------------------------------------------ fonts
-UNICODES = list(range(0x20, 0x7f)) + list(range(0xa0, 0x100)) + [0x2014, 0x2019, 0x2212]
+UNICODES = list(range(0x20, 0x7f)) + list(range(0xa0, 0x100)) + [0x2014, 0x2019, 0x2192, 0x2212]
 
 def font_b64(name):
     opts = subset.Options()
@@ -81,8 +81,8 @@ TWINKLE = '.tw{animation:tw ease-in-out infinite alternate}@keyframes tw{from{op
 STATIONS = [  # (accent key, name, axis, live)
     ('pot', 'Espacio', 'where?', True),
     ('time', 'Tiempo', 'when?', True),
-    ('civ', 'Destino', 'how far?', False),
-    ('inf', 'Infinito', "what's beyond?", False),
+    ('civ', 'Destino', 'how far?', True),
+    ('inf', 'Infinito', "what's beyond?", True),
 ]
 
 HEADLINE = ('Everything, from here.', 'Interactive pieces about the universe, and our place in it.')
