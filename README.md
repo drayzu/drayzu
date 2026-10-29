@@ -1,5 +1,5 @@
 <p align="center">
-  <picture><source type="image/avif" srcset="media/serie.avif"><img src="media/serie.webp" width="100%" alt="drayzu — Horizontes. Everything, from here. The four pieces play in sequence: Espacio, Tiempo, Destino and Infinito."></picture>
+  <picture><source type="image/avif" srcset="media/horizontes.avif"><img src="media/horizontes.webp" width="100%" alt="drayzu — Horizontes. Everything, from here. The four pieces play in sequence: Espacio, Tiempo, Destino and Infinito."></picture>
 </p>
 
 <p align="center">
@@ -10,5 +10,5 @@
 </p>
 
 <p align="center">
-  <a href="https://drayzu.github.io/Atlas/"><picture><source media="(prefers-color-scheme: dark)" srcset="media/atlas-note-dark.svg"><img src="media/atlas-note-light.svg" width="100%" alt="And to read further, the Atlas, the library of the series"></picture></a>
+  <a href="https://drayzu.github.io/Atlas/"><picture><source media="(prefers-color-scheme: dark)" srcset="media/atlas-dark.svg"><img src="media/atlas-light.svg" width="100%" alt="And to read further, the Atlas, the library of the series"></picture></a>
 </p>

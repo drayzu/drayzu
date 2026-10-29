@@ -1,12 +1,12 @@
 """Prototype: the whole series as one animated WebP that plays the four pieces in sequence.
 
-    python tools/secuencia.py        ->  media/serie.avif, serie.webp and link-*.svg (the published README)
+    python tools/secuencia.py        ->  media/horizontes.avif, horizontes.webp and link-*.svg (the published README)
 
 Every piece plays footage of its own site, from the frames each one records for its README.
 (The WebGL scenes in tools/escenas/escena.html, captured with headless Chrome by scene_media, stood in for the
 pieces before they were out; --fresh recaptures them.)
-Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/serie.avif), with a
-lighter WebP (media/serie.webp) for browsers without AVIF.
+Everything is composed with Pillow at 1840 px and encoded by ffmpeg as AVIF (media/horizontes.avif), with a
+lighter WebP (media/horizontes.webp) for browsers without AVIF.
 """
 import base64, importlib.util, io, json, os, socket, subprocess, tempfile, time, urllib.request
 
@@ -433,7 +433,7 @@ def main():
     fresh = (names or True) if '--fresh' in args else False
     os.makedirs(os.path.join(OUT, 'media'), exist_ok=True)
     for th, t in B.THEMES.items():
-        open(os.path.join(OUT, 'media', f'atlas-note-{th}.svg'), 'w', encoding='utf-8').write(atlas_note(t))
+        open(os.path.join(OUT, 'media', f'atlas-{th}.svg'), 'w', encoding='utf-8').write(atlas_note(t))
         for key, slug, name in (('pot', 'espacio', 'Espacio'), ('time', 'tiempo', 'Tiempo'),
                                 ('civ', 'destino', 'Destino'), ('inf', 'infinito', 'Infinito')):
             open(os.path.join(OUT, 'media', f'link-{slug}-{th}.svg'), 'w', encoding='utf-8').write(link_pill(t, key, name))
@@ -450,7 +450,7 @@ def main():
         return head.draw(fr, t, tg)
 
     print('composing...')
-    avif = os.path.join(OUT, 'media', 'serie.avif')
+    avif = os.path.join(OUT, 'media', 'horizontes.avif')
     enc = encode_avif(avif)
     last = compose(len(media) - 1, media[-1][-1][0](), 1, {})  # the loop crossfades from the end back to the start
     webp, webp_durs = [], []
@@ -478,11 +478,11 @@ def main():
         print(f'  {PIECES[k]["title"]}: {len(seq)} frames')
     enc.stdin.close()
     enc.wait()
-    print(f'  serie.avif  {os.path.getsize(avif) / 1e6:.2f} MB  ({CW}x{CH})')
-    dst = os.path.join(OUT, 'media', 'serie.webp')
+    print(f'  horizontes.avif  {os.path.getsize(avif) / 1e6:.2f} MB  ({CW}x{CH})')
+    dst = os.path.join(OUT, 'media', 'horizontes.webp')
     webp_durs = [round(d) for d in webp_durs]
     webp[0].save(dst, save_all=True, append_images=webp[1:], duration=webp_durs, loop=0, quality=WEBP_Q, method=4)
-    print(f'  serie.webp  {os.path.getsize(dst) / 1e6:.2f} MB  ({len(webp)} frames, {sum(webp_durs) / 1000:.1f} s)')
+    print(f'  horizontes.webp  {os.path.getsize(dst) / 1e6:.2f} MB  ({len(webp)} frames, {sum(webp_durs) / 1000:.1f} s)')
 
 if __name__ == '__main__':
     main()
