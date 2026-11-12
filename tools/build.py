@@ -20,9 +20,9 @@ SERIES = 'HORIZONTES'
 
 THEMES = {
     'dark': dict(ink='#ece7db', bg='#0d1117', panel='#0d1117',
-                 pot='#ff5b2e', astro='#e3c48a', time='#8fb4ff', civ='#6fe3c1', inf='#c9b4ff'),
+                 pot='#ff5b2e', astro='#e3c48a', time='#8fb4ff', civ='#6fe3c1', inf='#c9b4ff', soon='#8a8f99'),
     'light': dict(ink='#1f1d1a', bg='#ffffff', panel='#ffffff',
-                  pot='#d6461c', astro='#9a7430', time='#3a64c8', civ='#1f8f73', inf='#6e4fc9'),
+                  pot='#d6461c', astro='#9a7430', time='#3a64c8', civ='#1f8f73', inf='#6e4fc9', soon='#7a7f88'),
 }
 CARD = dict(THEMES['dark'], card='#0d1117')   # cards are dark in both themes
 
@@ -83,6 +83,10 @@ STATIONS = [  # (accent key, name, axis, live)
     ('time', 'Tiempo', 'when?', True),
     ('civ', 'Destino', 'how far?', True),
     ('inf', 'Infinito', "what's beyond?", True),
+    # coming works: grey until each is out, when it gets its own color
+    ('soon', 'Mente', 'who is looking?', False),
+    ('soon', 'Abismo', 'what for?', False),
+    ('soon', 'Vida', 'what do we do with it?', False),
 ]
 
 HEADLINE = ('Everything, from here.', 'Interactive pieces about the universe, and our place in it.')

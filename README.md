@@ -1,5 +1,5 @@
 <p align="center">
-  <picture><source type="image/avif" srcset="media/horizontes.avif"><img src="media/horizontes.webp" width="100%" alt="drayzu — Horizontes. Everything, from here. The four pieces play in sequence: Espacio, Tiempo, Destino and Infinito."></picture>
+  <picture><source type="image/avif" srcset="media/horizontes.avif"><img src="media/horizontes.webp" width="100%" alt="drayzu — Horizontes. Everything, from here. The four pieces play in sequence: Espacio, Tiempo, Destino and Infinito; Mente, Abismo and Vida are coming."></picture>
 </p>
 
 <p align="center">
@@ -7,6 +7,12 @@
   <a href="https://drayzu.github.io/Tiempo/"><picture><source media="(prefers-color-scheme: dark)" srcset="media/link-tiempo-dark.svg"><img src="media/link-tiempo-light.svg" width="49%" alt="Enter Tiempo"></picture></a>
   <a href="https://drayzu.github.io/Destino/"><picture><source media="(prefers-color-scheme: dark)" srcset="media/link-destino-dark.svg"><img src="media/link-destino-light.svg" width="49%" alt="Enter Destino"></picture></a>
   <a href="https://drayzu.github.io/Infinito/"><picture><source media="(prefers-color-scheme: dark)" srcset="media/link-infinito-dark.svg"><img src="media/link-infinito-light.svg" width="49%" alt="Enter Infinito"></picture></a>
+</p>
+
+<p align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="media/soon-mente-dark.svg"><img src="media/soon-mente-light.svg" width="49%" alt="Mente: coming soon"></picture>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="media/soon-abismo-dark.svg"><img src="media/soon-abismo-light.svg" width="49%" alt="Abismo: coming soon"></picture>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="media/soon-vida-dark.svg"><img src="media/soon-vida-light.svg" width="49%" alt="Vida: coming soon"></picture>
 </p>
 
 <p align="center">

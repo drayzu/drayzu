@@ -101,7 +101,7 @@ def spaced(d, xy, text, font, fill, sp=0.0, anchor='l'):
         x += font.getlength(c) + sp
     return x
 
-XS = [170, 390, 610, 830]
+XS = [110 + k * 130 for k in range(7)]   # one per station
 LY = 236
 
 PIECES = [  # station index, title, tagline, live (the Atlas, the series' library, is a link under the sequence)
@@ -438,6 +438,9 @@ def main():
         for key, slug, name in (('pot', 'espacio', 'Espacio'), ('time', 'tiempo', 'Tiempo'),
                                 ('civ', 'destino', 'Destino'), ('inf', 'infinito', 'Infinito')):
             open(os.path.join(OUT, 'media', f'link-{slug}-{th}.svg'), 'w', encoding='utf-8').write(link_pill(t, key, name))
+        for key, name, _, live in B.STATIONS:
+            if not live:
+                open(os.path.join(OUT, 'media', f'soon-{name.lower()}-{th}.svg'), 'w', encoding='utf-8').write(soon_pill(t, key, name))
     media = [espacio_media(), tiempo_media(), destino_media(), infinito_media()]
 
     head = Header()
